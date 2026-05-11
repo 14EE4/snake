@@ -312,6 +312,8 @@ int main()
 		std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
 	}
 
+	cout << "Game Over! Final Score: " << playerScore << endl;
+
 	// Close FPGA device if opened
 	if (fd_fpga_switch >= 0) {
 		close(fd_fpga_switch);
