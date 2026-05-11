@@ -30,6 +30,10 @@ bool use_fpga_switch = false;
 // FPGA FND device
 int fd_fpga_fnd = -1;
 
+// Interrupt switch device
+int fd_sw = -1;
+bool use_interrupt_switch = false;
+
 // Snake head coordinates of snake (x-axis, y-axis) 
 int x, y; 
 // Food coordinates 
@@ -47,6 +51,8 @@ enum snakesDirection { STOP = 0, LEFT, RIGHT, UP, DOWN };
 snakesDirection sDir; 
 // boolean variable for checking game is over or not 
 bool isGameOver; 
+
+bool gamePaused = false;
 
 void UpdateFNDScore(int score)
 {
@@ -127,9 +133,11 @@ void GameRender(string playerName)
 	// Display player's score 
 	cout << playerName << "'s Score: " << playerScore << endl; 
 	if (use_fpga_switch)
-		cout << "Control: Button 3=Left / 5=Right / 7=Up / 1=Down" << endl;
+		cout << "Control: Button 3=Left / 5=Right / 7=Up / 1=Down (FPGA Switch)" << endl;
+	else if (use_interrupt_switch)
+		cout << "Control: Interrupt Switch (cycles through directions)" << endl;
 	else
-		cout << "Control: Up: 8 / Down: 2 / Left: 4 / Right: 6" << endl;
+		cout << "Control: Up: 8 / Down: 2 / Left: 4 / Right: 6 (Keyboard)" << endl;
 } 
 
 // Function for updating the game state 
@@ -235,6 +243,22 @@ void FPGASwitchInput()
 		if (sw_state[5]) sDir = RIGHT;     // Button 5
 		if (sw_state[7]) sDir = DOWN;      // Button 7
 	}
+}
+
+// Function to handle interrupt switch input
+void InterruptSwitchInput()
+{
+    if (fd_sw < 0) return;
+
+    static unsigned char prev_state = 0;
+    unsigned char sw_state = 0;
+
+    if (read(fd_sw, &sw_state, 1) > 0) {
+        if (sw_state == 1 && prev_state == 0) {
+            gamePaused = !gamePaused;
+        }
+        prev_state = sw_state;
+    }
 } 
 #ifndef _WIN32
 static struct termios orig_termios;
@@ -278,6 +302,15 @@ int main()
 		cout << "FPGA FND device not found. Score will be shown on console only." << endl;
 	}
 
+	// Try to open interrupt switch device
+	fd_sw = open("/dev/my_led_dev", O_RDWR);
+	if (fd_sw >= 0) {
+		use_interrupt_switch = true;
+		cout << "Interrupt switch device opened successfully!" << endl;
+	} else {
+		cout << "Interrupt switch device not found." << endl;
+	}
+
 	GameInit();
 #ifndef _WIN32
 enableRawMode();
@@ -290,6 +323,8 @@ enableRawMode();
 		// Handle input from FPGA switch or keyboard
 		if (use_fpga_switch) {
 			FPGASwitchInput();
+		} else if (use_interrupt_switch) {
+			InterruptSwitchInput();
 		} else {
 			// platform-specific immediate-key handling
 #ifdef _WIN32
@@ -322,7 +357,9 @@ enableRawMode();
 #endif
 		}
 
-		UpdateGame();
+		if (!gamePaused) {
+			UpdateGame();
+		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
 	}
 
@@ -332,6 +369,9 @@ enableRawMode();
 	}
 	if (fd_fpga_fnd >= 0) {
 		close(fd_fpga_fnd);
+	}
+	if (fd_sw >= 0) {
+		close(fd_sw);
 	}
 
 	return 0; 
