@@ -1,5 +1,6 @@
 // required header file 
 #include <iostream>
+#include <string>
 #include <cstdlib>
 #include <chrono>
 #include <thread>
@@ -7,15 +8,10 @@
 #include <errno.h>
 #include <cstring>
 
-#ifdef _WIN32
-#include <conio.h>
-#include <windows.h>
-#else
 #include <termios.h>
 #include <unistd.h>
 #include <sys/select.h>
 #include <sys/ioctl.h>
-#endif
 
 using namespace std;
 
@@ -86,11 +82,7 @@ void GameInit()
 // Function for creating the game board & rendering 
 void GameRender(string playerName) 
 { 
-	#ifdef _WIN32
-	std::system("cls"); // Clear the console (Windows)
-	#else
 	std::system("clear"); // Clear the console (POSIX)
-	#endif
 
 	// Creating top walls with '-'
 	for (int i = 0; i < width + 2; i++)
@@ -199,19 +191,6 @@ void UpdateGame()
 // Function to handle user UserInput 
 void UserInput() 
 { 
-	// legacy handler: uses platform-specific kbhit/getch wrappers
-#ifdef _WIN32
-	if (_kbhit()) {
-		int key = _getch();
-		switch (key) {
-			case '4': sDir = LEFT; break;
-			case '6': sDir = RIGHT; break;
-			case '8': sDir = UP; break;
-			case '2': sDir = DOWN; break;
-			case '0': isGameOver = true; break;
-		}
-	}
-#else
 	fd_set set;
 	struct timeval tv;
 	FD_ZERO(&set);
@@ -227,7 +206,6 @@ void UserInput()
 			case '0': isGameOver = true; break;
 		}
 	}
-#endif
 }
 
 // Function to handle FPGA push switch input
@@ -260,7 +238,6 @@ void InterruptSwitchInput()
         prev_state = sw_state;
     }
 } 
-#ifndef _WIN32
 static struct termios orig_termios;
 
 void disableRawMode() {
@@ -276,7 +253,6 @@ void enableRawMode() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
     atexit(disableRawMode);
 }
-#endif
 
 // Main function / game looping function 
 int main() 
@@ -312,9 +288,7 @@ int main()
 	}
 
 	GameInit();
-#ifndef _WIN32
-enableRawMode();
-#endif
+	enableRawMode();
 	// Main game loop: render -> handle non-blocking input -> update -> wait
 	const unsigned int frameMs = 150; // milliseconds per movement update
 	while (!isGameOver) {
@@ -329,39 +303,7 @@ enableRawMode();
 		if (!gamePaused && use_fpga_switch) {
 			FPGASwitchInput();
 		} else if (!gamePaused) {
-			// platform-specific immediate-key handling
-#ifdef _WIN32
-			if (_kbhit()) {
-				int key = _getch();
-				switch (key) {
-					case '4': sDir = LEFT; break;
-					case '6': sDir = RIGHT; break;
-					case '8': sDir = UP; break;
-					case '2': sDir = DOWN; break;
-					case '0': isGameOver = true; break;
-				}
-			}
-#else
-			fd_set set;
-			struct timeval tv;
-			FD_ZERO(&set);
-			FD_SET(STDIN_FILENO, &set);
-			tv.tv_sec = 0; tv.tv_usec = 0;
-			if (select(STDIN_FILENO+1, &set, NULL, NULL, &tv) > 0) {
-				int key = getchar();
-				switch (key) {
-					case '4': sDir = LEFT; break;
-					case '6': sDir = RIGHT; break;
-					case '8': sDir = UP; break;
-					case '2': sDir = DOWN; break;
-					case '0': isGameOver = true; break;
-				}
-		// Handle movement input only when the game is not paused
-		if (!gamePaused) {
-			UpdateGame();
-		}
-			}
-#endif
+			UserInput();
 		}
 
 		if (!gamePaused) {

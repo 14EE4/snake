@@ -60,10 +60,13 @@ arm-linux-gnueabi-g++ snake.cpp -o snake -pthread
 ## Deploy & Run (라즈베리파이)
 
 ```bash
-# 1) 바이너리 전송 (Windows/WSL에서)
+# 1) 라즈베리파이 접속
+ssh pi02@210.125.213.129 -p 51234
+
+# 2) 바이너리 전송 (Windows/WSL에서)
 scp -P 51234 snake pi02@210.125.213.129:/home/pi02/workspace/
 
-# 2) 라즈베리파이에서 실행
+# 3) 라즈베리파이에서 실행
 ssh -p 51234 pi02@210.125.213.129
 cd ~/workspace
 sudo ./snake
