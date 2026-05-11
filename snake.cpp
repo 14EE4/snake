@@ -3,6 +3,9 @@
 #include <cstdlib>
 #include <chrono>
 #include <thread>
+#include <fcntl.h>
+#include <errno.h>
+#include <cstring>
 
 #ifdef _WIN32
 #include <conio.h>
@@ -18,7 +21,11 @@ using namespace std;
 
 // height and width of the boundary 
 const int width = 80; 
-const int height = 20; 
+const int height = 20;
+
+// FPGA push switch device
+int fd_fpga_switch = -1;
+bool use_fpga_switch = false; 
 
 // Snake head coordinates of snake (x-axis, y-axis) 
 int x, y; 
@@ -99,7 +106,10 @@ void GameRender(string playerName)
 
 	// Display player's score 
 	cout << playerName << "'s Score: " << playerScore << endl; 
-	cout << "Up: 8 / Down: 2 / Left: 4 / Right: 6" << endl;
+	if (use_fpga_switch)
+		cout << "Control: Button 3=Left / 5=Right / 7=Up / 1=Down" << endl;
+	else
+		cout << "Control: Up: 8 / Down: 2 / Left: 4 / Right: 6" << endl;
 } 
 
 // Function for updating the game state 
@@ -189,6 +199,21 @@ void UserInput()
 		}
 	}
 #endif
+}
+
+// Function to handle FPGA push switch input
+void FPGASwitchInput()
+{
+	if (fd_fpga_switch < 0) return;
+	
+	unsigned char sw_state[13];
+	if (read(fd_fpga_switch, sw_state, 13) > 0) {
+		// Button mapping: 1=UP, 3=LEFT, 5=RIGHT, 7=DOWN (위아래 반전)
+		if (sw_state[1]) sDir = UP;        // Button 1
+		if (sw_state[3]) sDir = LEFT;      // Button 3
+		if (sw_state[5]) sDir = RIGHT;     // Button 5
+		if (sw_state[7]) sDir = DOWN;      // Button 7
+	}
 } 
 #ifndef _WIN32
 static struct termios orig_termios;
@@ -213,7 +238,16 @@ int main()
 { 
 	string playerName; 
 	cout << "enter your name: "; 
-	cin >> playerName; 
+	cin >> playerName;
+
+	// Try to open FPGA push switch device
+	fd_fpga_switch = open("/dev/fpga_push_switch", O_RDWR);
+	if (fd_fpga_switch >= 0) {
+		use_fpga_switch = true;
+		cout << "FPGA push switch device opened successfully!" << endl;
+	} else {
+		cout << "FPGA push switch device not found. Using keyboard input." << endl;
+	}
 
 	GameInit();
 #ifndef _WIN32
@@ -224,38 +258,48 @@ enableRawMode();
 	while (!isGameOver) {
 		GameRender(playerName);
 
-		// platform-specific immediate-key handling
+		// Handle input from FPGA switch or keyboard
+		if (use_fpga_switch) {
+			FPGASwitchInput();
+		} else {
+			// platform-specific immediate-key handling
 #ifdef _WIN32
-		if (_kbhit()) {
-			int key = _getch();
-			switch (key) {
-				case '4': sDir = LEFT; break;
-				case '6': sDir = RIGHT; break;
-				case '8': sDir = UP; break;
-				case '2': sDir = DOWN; break;
-				case '0': isGameOver = true; break;
+			if (_kbhit()) {
+				int key = _getch();
+				switch (key) {
+					case '4': sDir = LEFT; break;
+					case '6': sDir = RIGHT; break;
+					case '8': sDir = UP; break;
+					case '2': sDir = DOWN; break;
+					case '0': isGameOver = true; break;
+				}
 			}
-		}
 #else
-		fd_set set;
-		struct timeval tv;
-		FD_ZERO(&set);
-		FD_SET(STDIN_FILENO, &set);
-		tv.tv_sec = 0; tv.tv_usec = 0;
-		if (select(STDIN_FILENO+1, &set, NULL, NULL, &tv) > 0) {
-			int key = getchar();
-			switch (key) {
-				case '4': sDir = LEFT; break;
-				case '6': sDir = RIGHT; break;
-				case '8': sDir = UP; break;
-				case '2': sDir = DOWN; break;
-				case '0': isGameOver = true; break;
+			fd_set set;
+			struct timeval tv;
+			FD_ZERO(&set);
+			FD_SET(STDIN_FILENO, &set);
+			tv.tv_sec = 0; tv.tv_usec = 0;
+			if (select(STDIN_FILENO+1, &set, NULL, NULL, &tv) > 0) {
+				int key = getchar();
+				switch (key) {
+					case '4': sDir = LEFT; break;
+					case '6': sDir = RIGHT; break;
+					case '8': sDir = UP; break;
+					case '2': sDir = DOWN; break;
+					case '0': isGameOver = true; break;
+				}
 			}
-		}
 #endif
+		}
 
 		UpdateGame();
 		std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
+	}
+
+	// Close FPGA device if opened
+	if (fd_fpga_switch >= 0) {
+		close(fd_fpga_switch);
 	}
 
 	return 0; 
