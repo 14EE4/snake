@@ -144,19 +144,19 @@ void UpdateGame()
 	switch (sDir) { 
 		case LEFT: 
 			x--;
-			if (x < 0) {x = 0;	return;}
+			if (x < 0) { isGameOver = true; return; }
 			break; 
 		case RIGHT: 
 			x++; 
-			if (x >= width) {x = width-1; return;}
+			if (x >= width) { isGameOver = true; return; }
 			break; 
 		case UP: 
 			y--; 
-			if (y < 0) {y = 0; return;}
+			if (y < 0) { isGameOver = true; return; }
 			break; 
 		case DOWN: 
 			y++; 
-			if (y >= height) {y = height-1; return;}
+			if (y >= height) { isGameOver = true; return; }
 			break; 
 	} 
 
@@ -311,6 +311,8 @@ int main()
 		}
 		std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
 	}
+
+	cout << "Game Over! Final Score: " << playerScore << endl;
 
 	// Close FPGA device if opened
 	if (fd_fpga_switch >= 0) {
