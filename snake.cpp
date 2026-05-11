@@ -92,50 +92,50 @@ void GameRender(string playerName)
 	std::system("clear"); // Clear the console (POSIX)
 	#endif
 
-	// Creating top walls with '-' 
-	for (int i = 0; i < width + 2; i++) 
-		cout << "-"; 
-	cout << endl; 
+	// Creating top walls with '-'
+	for (int i = 0; i < width + 2; i++)
+		cout << "-";
+	cout << endl;
 
-	for (int i = 0; i < height; i++) { 
-		for (int j = 0; j <= width; j++) { 
-			// Creating side walls with '|' 
-			if (j == 0 || j == width) 
-				cout << "|"; 
-			// Creating snake's head with 'O' 
-			if (i == y && j == x) 
-				cout << "O"; 
-			// Creating the sanke's food with '#' 
-			else if (i == fruitCordY && j == fruitCordX) 
-				cout << "#"; 
-			// Creating snake's head with 'O' 
-			else { 
-				bool prTail = false; 
-				for (int k = 0; k < snakeTailLen; k++) { 
-					if (snakeTailX[k] == j 
-							&& snakeTailY[k] == i) { 
-						cout << "o"; 
-						prTail = true; 
-					} 
-				} 
-				if (!prTail) 
-					cout << " "; 
-			} 
-		} 
-		cout << endl; 
-	} 
+	for (int i = 0; i < height; i++) {
+		for (int j = 0; j <= width; j++) {
+			// Creating side walls with '|'
+			if (j == 0 || j == width)
+				cout << "|";
+			// Creating snake's head with 'O'
+			if (i == y && j == x)
+				cout << "O";
+			// Creating the sanke's food with '#'
+			else if (i == fruitCordY && j == fruitCordX)
+				cout << "#";
+			else {
+				bool prTail = false;
+				for (int k = 0; k < snakeTailLen; k++) {
+					if (snakeTailX[k] == j && snakeTailY[k] == i) {
+						cout << "o";
+						prTail = true;
+					}
+				}
+				if (!prTail)
+					cout << " ";
+			}
+		}
+		cout << endl;
+	}
 
-	// Creating bottom walls with '-' 
-	for (int i = 0; i < width + 2; i++) 
-		cout << "-"; 
-	cout << endl; 
+	// Creating bottom walls with '-'
+	for (int i = 0; i < width + 2; i++)
+		cout << "-";
+	cout << endl;
 
-	// Display player's score 
-	cout << playerName << "'s Score: " << playerScore << endl; 
+	// Display player's score
+	cout << playerName << "'s Score: " << playerScore << endl;
+	if (gamePaused)
+		cout << "Game Paused: Interrupt switch to resume" << endl;
 	if (use_fpga_switch)
 		cout << "Control: Button 3=Left / 5=Right / 7=Up / 1=Down (FPGA Switch)" << endl;
 	else if (use_interrupt_switch)
-		cout << "Control: Interrupt Switch (cycles through directions)" << endl;
+		cout << "Control: Interrupt Switch (press to pause/resume)" << endl;
 	else
 		cout << "Control: Up: 8 / Down: 2 / Left: 4 / Right: 6 (Keyboard)" << endl;
 } 
@@ -320,12 +320,15 @@ enableRawMode();
 	while (!isGameOver) {
 		GameRender(playerName);
 
-		// Handle input from FPGA switch or keyboard
-		if (use_fpga_switch) {
-			FPGASwitchInput();
-		} else if (use_interrupt_switch) {
+		// Interrupt switch is always checked first so it can pause/resume the game
+		if (use_interrupt_switch) {
 			InterruptSwitchInput();
-		} else {
+		}
+
+		// Handle movement input only when the game is not paused
+		if (!gamePaused && use_fpga_switch) {
+			FPGASwitchInput();
+		} else if (!gamePaused) {
 			// platform-specific immediate-key handling
 #ifdef _WIN32
 			if (_kbhit()) {
@@ -353,6 +356,10 @@ enableRawMode();
 					case '2': sDir = DOWN; break;
 					case '0': isGameOver = true; break;
 				}
+		// Handle movement input only when the game is not paused
+		if (!gamePaused) {
+			UpdateGame();
+		}
 			}
 #endif
 		}
