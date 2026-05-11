@@ -7,6 +7,7 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 - FPGA push switch로 게임 조작 (버튼: 1=UP, 3=LEFT, 5=RIGHT, 7=DOWN)
 - 점수를 FND 디스플레이에 4자리 숫자로 표시
 - 키보드 입력 지원 (fallback)
+- 벽 또는 자기 꼬리 충돌 시 게임 오버 처리
 
 ## Device Mapping
 
@@ -70,6 +71,37 @@ scp -P 51234 snake pi02@210.125.213.129:/home/pi02/workspace/
 ssh -p 51234 pi02@210.125.213.129
 cd ~/workspace
 sudo ./snake
+```
+
+## Example Run
+
+```text
+----------------------------------------------------------------------------------
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                                                |
+|                                                         #                      |
+|                                                                                |
+|                                                                                |
+|                        o                                                       |
+|                        O                                                       |
+----------------------------------------------------------------------------------
+a's Score: 10
+Control: Button 3=Left / 5=Right / 7=Up / 1=Down (FPGA Switch)
+Game Over! Final Score: 10
+pi02@pi02:~/workspace $
 ```
 
 ## Cleanup
