@@ -27,6 +27,9 @@ const int height = 20;
 int fd_fpga_switch = -1;
 bool use_fpga_switch = false; 
 
+// FPGA FND device
+int fd_fpga_fnd = -1;
+
 // Snake head coordinates of snake (x-axis, y-axis) 
 int x, y; 
 // Food coordinates 
@@ -45,6 +48,22 @@ snakesDirection sDir;
 // boolean variable for checking game is over or not 
 bool isGameOver; 
 
+void UpdateFNDScore(int score)
+{
+	if (fd_fpga_fnd < 0) return;
+
+	unsigned char fnd_value[4];
+	if (score < 0) score = 0;
+	if (score > 9999) score = 9999;
+
+	fnd_value[0] = (score / 1000) % 10;
+	fnd_value[1] = (score / 100) % 10;
+	fnd_value[2] = (score / 10) % 10;
+	fnd_value[3] = score % 10;
+
+	write(fd_fpga_fnd, fnd_value, 4);
+}
+
 // Function to initialize game variables 
 void GameInit() 
 { 
@@ -55,6 +74,7 @@ void GameInit()
 	fruitCordX = rand() % width; 
 	fruitCordY = rand() % height; 
 	playerScore = 0; 
+	UpdateFNDScore(playerScore);
 } 
 
 // Function for creating the game board & rendering 
@@ -164,6 +184,7 @@ void UpdateGame()
 		fruitCordX = rand() % width; 
 		fruitCordY = rand() % height; 
 		snakeTailLen++; 
+		UpdateFNDScore(playerScore);
 	} 
 } 
 
@@ -249,6 +270,14 @@ int main()
 		cout << "FPGA push switch device not found. Using keyboard input." << endl;
 	}
 
+	// Try to open FPGA FND device
+	fd_fpga_fnd = open("/dev/fpga_fnd", O_RDWR);
+	if (fd_fpga_fnd >= 0) {
+		cout << "FPGA FND device opened successfully!" << endl;
+	} else {
+		cout << "FPGA FND device not found. Score will be shown on console only." << endl;
+	}
+
 	GameInit();
 #ifndef _WIN32
 enableRawMode();
@@ -300,6 +329,9 @@ enableRawMode();
 	// Close FPGA device if opened
 	if (fd_fpga_switch >= 0) {
 		close(fd_fpga_switch);
+	}
+	if (fd_fpga_fnd >= 0) {
+		close(fd_fpga_fnd);
 	}
 
 	return 0; 
