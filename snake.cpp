@@ -50,6 +50,9 @@ bool isGameOver;
 
 bool gamePaused = false;
 
+void disableRawMode();
+void enableRawMode();
+
 void UpdateFNDScore(int score)
 {
 	if (fd_fpga_fnd < 0) return;
@@ -70,14 +73,58 @@ void UpdateFNDScore(int score)
 void GameInit() 
 { 
 	isGameOver = false; 
+	gamePaused = false;
 	sDir = STOP; 
 	x = width / 2; 
 	y = height / 2; 
 	fruitCordX = rand() % width; 
 	fruitCordY = rand() % height; 
 	playerScore = 0; 
+	snakeTailLen = 0;
+	memset(snakeTailX, 0, sizeof(snakeTailX));
+	memset(snakeTailY, 0, sizeof(snakeTailY));
 	UpdateFNDScore(playerScore);
 } 
+
+bool PromptRestart()
+{
+	disableRawMode();
+
+	while (true) {
+		cout << "Game Over! Final Score: " << playerScore << endl;
+		if (use_fpga_switch) {
+			cout << "Restart? FPGA Switch 0 = restart, 2 = exit" << endl;
+			unsigned char sw_state[13];
+			if (read(fd_fpga_switch, sw_state, 13) > 0) {
+				if (sw_state[0]) {
+					enableRawMode();
+					return true;
+				}
+				if (sw_state[2]) {
+					return false;
+				}
+			}
+		} else {
+			cout << "Restart? (y/n): " << flush;
+
+			char choice;
+			if (!(cin >> choice)) {
+				return false;
+			}
+
+			if (choice == 'y' || choice == 'Y') {
+				enableRawMode();
+				return true;
+			}
+
+			if (choice == 'n' || choice == 'N') {
+				return false;
+			}
+
+			cout << "Please enter y or n." << endl;
+		}
+	}
+}
 
 // Function for creating the game board & rendering 
 void GameRender(string playerName) 
@@ -291,28 +338,34 @@ int main()
 	enableRawMode();
 	// Main game loop: render -> handle non-blocking input -> update -> wait
 	const unsigned int frameMs = 150; // milliseconds per movement update
-	while (!isGameOver) {
-		GameRender(playerName);
+	while (true) {
+		while (!isGameOver) {
+			GameRender(playerName);
 
-		// Interrupt switch is always checked first so it can pause/resume the game
-		if (use_interrupt_switch) {
-			InterruptSwitchInput();
+			// Interrupt switch is always checked first so it can pause/resume the game
+			if (use_interrupt_switch) {
+				InterruptSwitchInput();
+			}
+
+			// Handle movement input only when the game is not paused
+			if (!gamePaused && use_fpga_switch) {
+				FPGASwitchInput();
+			} else if (!gamePaused) {
+				UserInput();
+			}
+
+			if (!gamePaused) {
+				UpdateGame();
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
 		}
 
-		// Handle movement input only when the game is not paused
-		if (!gamePaused && use_fpga_switch) {
-			FPGASwitchInput();
-		} else if (!gamePaused) {
-			UserInput();
+		if (!PromptRestart()) {
+			break;
 		}
 
-		if (!gamePaused) {
-			UpdateGame();
-		}
-		std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
+		GameInit();
 	}
-
-	cout << "Game Over! Final Score: " << playerScore << endl;
 
 	// Close FPGA device if opened
 	if (fd_fpga_switch >= 0) {
