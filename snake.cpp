@@ -174,7 +174,7 @@ void GameRender(string playerName)
 	if (gamePaused)
 		cout << "Game Paused: Interrupt switch to resume" << endl;
 	if (use_fpga_switch)
-		cout << "Control: Button 3=Left / 5=Right / 7=Up / 1=Down (FPGA Switch)" << endl;
+		cout << "Control: Button 1=Up / 3=Left / 5=Right / 7=Down (FPGA Switch)" << endl;
 	else if (use_interrupt_switch)
 		cout << "Control: Interrupt Switch (press to pause/resume)" << endl;
 	else
