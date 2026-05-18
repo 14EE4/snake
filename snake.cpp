@@ -107,36 +107,36 @@ unsigned int SelectDifficulty()
 
 	if (use_fpga_switch)
 	{
-		cout << "Button 1 = Easy   (200ms - 느리게)" << endl;
-		cout << "Button 3 = Normal (150ms - 보통)" << endl;
-		cout << "Button 5 = Hard   (100ms - 빠르게)" << endl;
+		cout << "Button 0 = Easy   (200ms - 느리게)" << endl;
+		cout << "Button 1 = Normal (150ms - 보통)" << endl;
+		cout << "Button 2 = Hard   (100ms - 빠르게)" << endl;
 
 		while (true)
 		{
 			unsigned char sw_state[13];
 			if (read(fd_fpga_switch, sw_state, 13) > 0)
 			{
-				if (sw_state[1]) { cout << ">> Easy 선택!" << endl;   sleep(1); return 200; }
-				if (sw_state[3]) { cout << ">> Normal 선택!" << endl; sleep(1); return 150; }
-				if (sw_state[5]) { cout << ">> Hard 선택!" << endl;   sleep(1); return 100; }
+				if (sw_state[0]) { cout << ">> Easy 선택!" << endl;   sleep(1); return 200; }
+				if (sw_state[1]) { cout << ">> Normal 선택!" << endl; sleep(1); return 150; }
+				if (sw_state[2]) { cout << ">> Hard 선택!" << endl;   sleep(1); return 100; }
 			}
 		}
 	}
 	else
 	{
-		cout << "1 = Easy   (200ms - 느리게)" << endl;
-		cout << "2 = Normal (150ms - 보통)" << endl;
-		cout << "3 = Hard   (100ms - 빠르게)" << endl;
+		cout << "0 = Easy   (200ms - 느리게)" << endl;
+		cout << "1 = Normal (150ms - 보통)" << endl;
+		cout << "2 = Hard   (100ms - 빠르게)" << endl;
 		cout << "선택: " << flush;
 
 		char choice;
 		while (true)
 		{
 			cin >> choice;
-			if (choice == '1') { cout << ">> Easy 선택!" << endl;   return 200; }
-			if (choice == '2') { cout << ">> Normal 선택!" << endl; return 150; }
-			if (choice == '3') { cout << ">> Hard 선택!" << endl;   return 100; }
-			cout << "1, 2, 3 중에 선택해주세요: " << flush;
+			if (choice == '0') { cout << ">> Easy 선택!" << endl;   return 200; }
+			if (choice == '1') { cout << ">> Normal 선택!" << endl; return 150; }
+			if (choice == '2') { cout << ">> Hard 선택!" << endl;   return 100; }
+			cout << "0, 1, 2 중에 선택해주세요: " << flush;
 		}
 	}
 }

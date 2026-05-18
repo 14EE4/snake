@@ -5,6 +5,7 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 ## Features
 
 - FPGA push switch로 게임 조작 (버튼: 1=UP, 3=LEFT, 5=RIGHT, 7=DOWN)
+- 난이도 선택은 0=Easy, 1=Normal, 2=Hard로 입력
 - 점수를 FND 디스플레이에 4자리 숫자로 표시
 - 키보드 입력 지원 (fallback)
 - 벽 또는 자기 꼬리 충돌 시 게임 오버 처리
@@ -144,6 +145,8 @@ sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
 1. **FPGA Push Switch**: 버튼 1,3,5,7로 조작 (4개 버튼)
 2. **Interrupt Switch**: GPIO2 기반 인터럽트로 게임 pause/resume 토글
 3. **Keyboard**: 8,2,4,6 키로 조작 (fallback)
+
+난이도 선택은 FPGA 스위치 0,1,2 또는 키보드 0,1,2로 진행합니다.
 
 게임 시작 시 어떤 입력 방식이 활성화되었는지 화면에 표시됩니다.
 
