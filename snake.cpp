@@ -111,6 +111,26 @@ unsigned int SelectDifficulty()
 		cout << "Button 1 = Normal (150ms - 보통)" << endl;
 		cout << "Button 2 = Hard   (100ms - 빠르게)" << endl;
 
+		// Wait for all buttons to be released before reading input
+		unsigned char sw_state[13];
+		bool anyPressed = true;
+		while (anyPressed)
+		{
+			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			{
+				anyPressed = false;
+				for (int i = 0; i < 13; i++)
+				{
+					if (sw_state[i])
+					{
+						anyPressed = true;
+						break;
+					}
+				}
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		}
+
 		while (true)
 		{
 			unsigned char sw_state[13];
