@@ -58,6 +58,7 @@ snakesDirection sDir;
 bool isGameOver;
 
 bool gamePaused = false;
+bool pauseMenuActive = false;
 
 void disableRawMode();
 void enableRawMode();
@@ -429,6 +430,132 @@ void InterruptSwitchInput()
 	}
 }
 
+// Show a single-shot pause menu when the game is paused via interrupt.
+// Returns true to resume, false to end the game (treat as game over).
+bool PauseMenu()
+{
+	disableRawMode();
+
+	cout << "\n=== Game Paused ===" << endl;
+	if (use_fpga_switch)
+	{
+		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
+	}
+	if (use_interrupt_switch)
+	{
+		cout << "Interrupt switch: press to resume. Press 'q' to exit." << endl;
+	}
+	else
+	{
+		cout << "Keyboard: r = resume, q = exit" << endl;
+	}
+
+	unsigned char prev_fpga[13] = {0};
+	unsigned char prev_sw = 0;
+
+	// If FPGA switches are available, handle ONLY Button 0(resume) and Button 2(exit).
+	if (use_fpga_switch && fd_fpga_switch >= 0)
+	{
+		// consume current state and wait for release if pressed
+		unsigned char sw_state[13];
+		if (read(fd_fpga_switch, sw_state, 13) > 0)
+		{
+			memcpy(prev_fpga, sw_state, 13);
+			bool anyPressed = (prev_fpga[0] || prev_fpga[2]);
+			while (anyPressed)
+			{
+				if (read(fd_fpga_switch, sw_state, 13) > 0)
+				{
+					memcpy(prev_fpga, sw_state, 13);
+					anyPressed = (prev_fpga[0] || prev_fpga[2]);
+				}
+				std::this_thread::sleep_for(std::chrono::milliseconds(50));
+			}
+		}
+
+		while (true)
+		{
+			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			{
+				// resume on rising edge of button 0
+				if (sw_state[0] && !prev_fpga[0])
+				{
+					enableRawMode();
+					return true;
+				}
+				// exit on rising edge of button 2
+				if (sw_state[2] && !prev_fpga[2])
+				{
+					return false;
+				}
+				memcpy(prev_fpga, sw_state, 13);
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		}
+	}
+
+	// If no FPGA push switch, fallback: allow interrupt switch or keyboard
+	while (true)
+	{
+		// Check FPGA push switch (if present)
+		if (use_fpga_switch && fd_fpga_switch >= 0)
+		{
+			unsigned char sw_state[13];
+			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			{
+				if (sw_state[0] && !prev_fpga[0])
+				{
+					enableRawMode();
+					return true;
+				}
+				if (sw_state[2] && !prev_fpga[2])
+				{
+					return false;
+				}
+				memcpy(prev_fpga, sw_state, 13);
+			}
+		}
+
+		// Check interrupt switch for resume (rising edge)
+		if (use_interrupt_switch && fd_sw >= 0)
+		{
+			unsigned char sw = 0;
+			if (read(fd_sw, &sw, 1) > 0)
+			{
+				if (sw == 1 && prev_sw == 0)
+				{
+					enableRawMode();
+					return true;
+				}
+				prev_sw = sw;
+			}
+		}
+
+		// Check keyboard input
+		fd_set set;
+		struct timeval tv;
+		FD_ZERO(&set);
+		FD_SET(STDIN_FILENO, &set);
+		tv.tv_sec = 0;
+		tv.tv_usec = 100000; // 100ms
+		if (select(STDIN_FILENO + 1, &set, NULL, NULL, &tv) > 0)
+		{
+			int c = getchar();
+			if (c == 'q' || c == 'Q')
+			{
+				return false;
+			}
+			if (c == 'r' || c == 'R')
+			{
+				enableRawMode();
+				return true;
+			}
+		}
+
+		std::this_thread::sleep_for(std::chrono::milliseconds(50));
+	}
+}
+
 static struct termios orig_termios;
 
 void disableRawMode()
@@ -502,6 +629,24 @@ int main()
 			if (use_interrupt_switch)
 			{
 				InterruptSwitchInput();
+
+				// If paused by interrupt, show a single-shot pause menu (no repeated prints)
+				if (gamePaused && !pauseMenuActive)
+				{
+					pauseMenuActive = true;
+					bool resume = PauseMenu();
+					pauseMenuActive = false;
+					if (!resume)
+					{
+						isGameOver = true;
+						break;
+					}
+					else
+					{
+						gamePaused = false;
+						continue;
+					}
+				}
 			}
 
 			// Handle movement input only when the game is not paused
