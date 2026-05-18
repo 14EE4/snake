@@ -441,13 +441,9 @@ bool PauseMenu()
 	{
 		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
 	}
-	if (use_interrupt_switch)
+	if (!use_fpga_switch)
 	{
-		cout << "Interrupt switch: press to resume. Press 'q' to exit." << endl;
-	}
-	else
-	{
-		cout << "Keyboard: r = resume, q = exit" << endl;
+		cout << "Keyboard: r = resume" << endl;
 	}
 
 	unsigned char prev_fpga[13] = {0};
@@ -494,7 +490,7 @@ bool PauseMenu()
 		}
 	}
 
-	// If no FPGA push switch, fallback: allow interrupt switch or keyboard
+	// If no FPGA push switch, fallback to keyboard only.
 	while (true)
 	{
 		// Check FPGA push switch (if present)
@@ -516,21 +512,6 @@ bool PauseMenu()
 			}
 		}
 
-		// Check interrupt switch for resume (rising edge)
-		if (use_interrupt_switch && fd_sw >= 0)
-		{
-			unsigned char sw = 0;
-			if (read(fd_sw, &sw, 1) > 0)
-			{
-				if (sw == 1 && prev_sw == 0)
-				{
-					enableRawMode();
-					return true;
-				}
-				prev_sw = sw;
-			}
-		}
-
 		// Check keyboard input
 		fd_set set;
 		struct timeval tv;
@@ -541,10 +522,6 @@ bool PauseMenu()
 		if (select(STDIN_FILENO + 1, &set, NULL, NULL, &tv) > 0)
 		{
 			int c = getchar();
-			if (c == 'q' || c == 'Q')
-			{
-				return false;
-			}
 			if (c == 'r' || c == 'R')
 			{
 				enableRawMode();
