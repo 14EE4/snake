@@ -9,6 +9,10 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 - 키보드 입력 지원 (fallback)
 - 벽 또는 자기 꼬리 충돌 시 게임 오버 처리
 - 게임 오버 후 FPGA Switch 0으로 재시작, 2로 종료 선택 가능
+- 매 게임마다 이름 입력받고 점수 기록
+- 최고 점수 및 기록자 이름 추적
+- 새로운 기록 달성 시 축하 메시지 표시
+- 최고 점수 미달 시 현재 점수와 최고 점수, 각각의 플레이어 이름 표시
 
 ## Device Mapping
 
@@ -77,6 +81,10 @@ sudo ./snake
 ## Example Run
 
 ```text
+FPGA push switch device opened successfully!
+FPGA FND device opened successfully!
+Interrupt switch device opened successfully!
+
 ----------------------------------------------------------------------------------
 |                                                                                |
 |                                                                                |
@@ -99,11 +107,23 @@ sudo ./snake
 |                        o                                                       |
 |                        O                                                       |
 ----------------------------------------------------------------------------------
-a's Score: 10
+Player's Score: 10
 Control: Button 1=Up / 3=Left / 5=Right / 7=Down (FPGA Switch)
+Enter your name to record this score: John
 Game Over! Final Score: 10
+*** NEW HIGH SCORE! ***
+
 Restart? FPGA Switch 0 = restart, 2 = exit
-pi02@pi02:~/workspace $
+
+(... 다시 게임 진행 후 ...)
+
+Player's Score: 5
+Game Over! Final Score: 5
+Enter your name to record this score: Alice
+Current Score: 5 (Alice)
+High Score: 10 (John)
+
+Restart? FPGA Switch 0 = restart, 2 = exit
 ```
 
 ## Cleanup
@@ -128,10 +148,13 @@ sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
 
 ## Restart Behavior
 
-- 게임 오버가 되면 FPGA Switch 입력으로 재시작 여부를 선택합니다.
-- `0` 버튼을 누르면 같은 설정으로 다시 시작합니다.
-- `2` 버튼을 누르면 게임을 종료합니다.
+- 게임 시작 시 이름 입력을 받지 않고 바로 시작됩니다.
+- 게임 오버가 되면 점수를 기록할 이름을 입력받습니다.
+- 현재 점수가 최고 점수보다 높으면 최고 점수로 갱신되고 "*** NEW HIGH SCORE! ***" 메시지를 표시합니다.
+- 현재 점수가 최고 점수보다 낮으면 현재 점수 및 이름, 그리고 최고 점수 및 그 기록자의 이름을 함께 표시합니다.
+- 이후 FPGA Switch 0으로 재시작하거나, 2로 종료를 선택합니다.
 - FPGA Switch가 없을 때는 기존처럼 `y/n` 키보드 입력으로 재시작을 선택합니다.
+- 최고 점수는 게임 실행 중 메모리에 유지되며, 현재 세션 동안 갱신됩니다.
 
 ## Interrupt Switch Behavior
 
