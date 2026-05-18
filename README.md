@@ -8,6 +8,7 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 - 점수를 FND 디스플레이에 4자리 숫자로 표시
 - 키보드 입력 지원 (fallback)
 - 벽 또는 자기 꼬리 충돌 시 게임 오버 처리
+- 게임 오버 후 FPGA Switch 0으로 재시작, 2로 종료 선택 가능
 
 ## Device Mapping
 
@@ -99,8 +100,9 @@ sudo ./snake
 |                        O                                                       |
 ----------------------------------------------------------------------------------
 a's Score: 10
-Control: Button 3=Left / 5=Right / 7=Up / 1=Down (FPGA Switch)
+Control: Button 1=Up / 3=Left / 5=Right / 7=Down (FPGA Switch)
 Game Over! Final Score: 10
+Restart? FPGA Switch 0 = restart, 2 = exit
 pi02@pi02:~/workspace $
 ```
 
@@ -123,6 +125,13 @@ sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
 3. **Keyboard**: 8,2,4,6 키로 조작 (fallback)
 
 게임 시작 시 어떤 입력 방식이 활성화되었는지 화면에 표시됩니다.
+
+## Restart Behavior
+
+- 게임 오버가 되면 FPGA Switch 입력으로 재시작 여부를 선택합니다.
+- `0` 버튼을 누르면 같은 설정으로 다시 시작합니다.
+- `2` 버튼을 누르면 게임을 종료합니다.
+- FPGA Switch가 없을 때는 기존처럼 `y/n` 키보드 입력으로 재시작을 선택합니다.
 
 ## Interrupt Switch Behavior
 
