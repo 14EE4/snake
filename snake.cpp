@@ -107,36 +107,56 @@ unsigned int SelectDifficulty()
 
 	if (use_fpga_switch)
 	{
-		cout << "Button 1 = Easy   (200ms - 느리게)" << endl;
-		cout << "Button 3 = Normal (150ms - 보통)" << endl;
-		cout << "Button 5 = Hard   (100ms - 빠르게)" << endl;
+		cout << "Button 0 = Easy   (200ms - 느리게)" << endl;
+		cout << "Button 1 = Normal (150ms - 보통)" << endl;
+		cout << "Button 2 = Hard   (100ms - 빠르게)" << endl;
+
+		// Wait for all buttons to be released before reading input
+		unsigned char sw_state[13];
+		bool anyPressed = true;
+		while (anyPressed)
+		{
+			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			{
+				anyPressed = false;
+				for (int i = 0; i < 13; i++)
+				{
+					if (sw_state[i])
+					{
+						anyPressed = true;
+						break;
+					}
+				}
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		}
 
 		while (true)
 		{
 			unsigned char sw_state[13];
 			if (read(fd_fpga_switch, sw_state, 13) > 0)
 			{
-				if (sw_state[1]) { cout << ">> Easy 선택!" << endl;   sleep(1); return 200; }
-				if (sw_state[3]) { cout << ">> Normal 선택!" << endl; sleep(1); return 150; }
-				if (sw_state[5]) { cout << ">> Hard 선택!" << endl;   sleep(1); return 100; }
+				if (sw_state[0]) { cout << ">> Easy 선택!" << endl;   sleep(1); return 200; }
+				if (sw_state[1]) { cout << ">> Normal 선택!" << endl; sleep(1); return 150; }
+				if (sw_state[2]) { cout << ">> Hard 선택!" << endl;   sleep(1); return 100; }
 			}
 		}
 	}
 	else
 	{
-		cout << "1 = Easy   (200ms - 느리게)" << endl;
-		cout << "2 = Normal (150ms - 보통)" << endl;
-		cout << "3 = Hard   (100ms - 빠르게)" << endl;
+		cout << "0 = Easy   (200ms - 느리게)" << endl;
+		cout << "1 = Normal (150ms - 보통)" << endl;
+		cout << "2 = Hard   (100ms - 빠르게)" << endl;
 		cout << "선택: " << flush;
 
 		char choice;
 		while (true)
 		{
 			cin >> choice;
-			if (choice == '1') { cout << ">> Easy 선택!" << endl;   return 200; }
-			if (choice == '2') { cout << ">> Normal 선택!" << endl; return 150; }
-			if (choice == '3') { cout << ">> Hard 선택!" << endl;   return 100; }
-			cout << "1, 2, 3 중에 선택해주세요: " << flush;
+			if (choice == '0') { cout << ">> Easy 선택!" << endl;   return 200; }
+			if (choice == '1') { cout << ">> Normal 선택!" << endl; return 150; }
+			if (choice == '2') { cout << ">> Hard 선택!" << endl;   return 100; }
+			cout << "0, 1, 2 중에 선택해주세요: " << flush;
 		}
 	}
 }
@@ -441,13 +461,9 @@ bool PauseMenu()
 	{
 		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
 	}
-	if (use_interrupt_switch)
+	if (!use_fpga_switch)
 	{
-		cout << "Interrupt switch: press to resume. Press 'q' to exit." << endl;
-	}
-	else
-	{
-		cout << "Keyboard: r = resume, q = exit" << endl;
+		cout << "Keyboard: r = resume" << endl;
 	}
 
 	unsigned char prev_fpga[13] = {0};
@@ -494,7 +510,7 @@ bool PauseMenu()
 		}
 	}
 
-	// If no FPGA push switch, fallback: allow interrupt switch or keyboard
+	// If no FPGA push switch, fallback to keyboard only.
 	while (true)
 	{
 		// Check FPGA push switch (if present)
@@ -516,21 +532,6 @@ bool PauseMenu()
 			}
 		}
 
-		// Check interrupt switch for resume (rising edge)
-		if (use_interrupt_switch && fd_sw >= 0)
-		{
-			unsigned char sw = 0;
-			if (read(fd_sw, &sw, 1) > 0)
-			{
-				if (sw == 1 && prev_sw == 0)
-				{
-					enableRawMode();
-					return true;
-				}
-				prev_sw = sw;
-			}
-		}
-
 		// Check keyboard input
 		fd_set set;
 		struct timeval tv;
@@ -541,10 +542,6 @@ bool PauseMenu()
 		if (select(STDIN_FILENO + 1, &set, NULL, NULL, &tv) > 0)
 		{
 			int c = getchar();
-			if (c == 'q' || c == 'Q')
-			{
-				return false;
-			}
 			if (c == 'r' || c == 'R')
 			{
 				enableRawMode();
