@@ -89,11 +89,15 @@ void GameInit()
 bool PromptRestart()
 {
 	disableRawMode();
+	cout << "Game Over! Final Score: " << playerScore << endl;
+	if (use_fpga_switch) {
+		cout << "Restart? FPGA Switch 0 = restart, 2 = exit" << endl;
+	} else {
+		cout << "Restart? (y/n): " << flush;
+	}
 
 	while (true) {
-		cout << "Game Over! Final Score: " << playerScore << endl;
 		if (use_fpga_switch) {
-			cout << "Restart? FPGA Switch 0 = restart, 2 = exit" << endl;
 			unsigned char sw_state[13];
 			if (read(fd_fpga_switch, sw_state, 13) > 0) {
 				if (sw_state[0]) {
@@ -105,8 +109,6 @@ bool PromptRestart()
 				}
 			}
 		} else {
-			cout << "Restart? (y/n): " << flush;
-
 			char choice;
 			if (!(cin >> choice)) {
 				return false;
