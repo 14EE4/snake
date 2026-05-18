@@ -32,6 +32,8 @@ bool use_interrupt_switch = false;
 
 // Snake head coordinates of snake (x-axis, y-axis)
 int x, y;
+// Whether hitting wall wraps to opposite side (true) or causes death (false)
+bool wrapWalls = false;
 // Food coordinates
 int fruitCordX, fruitCordY;
 // variable to store the score of the player
@@ -157,6 +159,64 @@ unsigned int SelectDifficulty()
 			if (choice == '1') { cout << ">> Normal 선택!" << endl; return 150; }
 			if (choice == '2') { cout << ">> Hard 선택!" << endl;   return 100; }
 			cout << "0, 1, 2 중에 선택해주세요: " << flush;
+		}
+	}
+}
+
+// Function to select wall behavior mode
+bool SelectMode()
+{
+	cout << endl;
+	cout << "=== Select Mode ===" << endl;
+
+	if (use_fpga_switch)
+	{
+		cout << "Button 0 = Normal (벽 닿으면 죽음)" << endl;
+		cout << "Button 1 = Wrap   (벽 닿으면 반대편으로 넘어감)" << endl;
+
+		// Wait for release
+		unsigned char sw_state[13];
+		bool anyPressed = true;
+		while (anyPressed)
+		{
+			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			{
+				anyPressed = false;
+				for (int i = 0; i < 13; i++)
+				{
+					if (sw_state[i])
+					{
+						anyPressed = true;
+						break;
+					}
+				}
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(50));
+		}
+
+		while (true)
+		{
+			unsigned char sw_state[13];
+			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			{
+				if (sw_state[0]) { cout << ">> Normal 모드 선택!" << endl; sleep(1); return false; }
+				if (sw_state[1]) { cout << ">> Wrap 모드 선택!" << endl;   sleep(1); return true; }
+			}
+		}
+	}
+	else
+	{
+		cout << "0 = Normal (벽 닿으면 죽음)" << endl;
+		cout << "1 = Wrap   (벽 닿으면 반대편으로 넘어감)" << endl;
+		cout << "선택: " << flush;
+
+		char choice;
+		while (true)
+		{
+			cin >> choice;
+			if (choice == '0') { cout << ">> Normal 모드 선택!" << endl;   return false; }
+			if (choice == '1') { cout << ">> Wrap 모드 선택!" << endl;     return true; }
+			cout << "0 또는 1 중에 선택해주세요: " << flush;
 		}
 	}
 }
@@ -291,6 +351,10 @@ void GameRender(string playerName, unsigned int frameMs)
 	string diffLabel = (frameMs == 200) ? "Easy" : (frameMs == 150) ? "Normal" : "Hard";
 	cout << "Difficulty: " << diffLabel << endl;
 
+	// Display mode
+	string modeLabel = wrapWalls ? "Wrap (벽 닿으면 반대편으로)" : "Normal (벽 닿으면 죽음)";
+	cout << "Mode: " << modeLabel << endl;
+
 	if (gamePaused)
 		cout << "Game Paused: Interrupt switch to resume" << endl;
 	if (use_fpga_switch)
@@ -316,32 +380,52 @@ void UpdateGame()
 		x--;
 		if (x < 0)
 		{
-			isGameOver = true;
-			return;
+			if (wrapWalls)
+				x = width - 1;
+			else
+			{
+				isGameOver = true;
+				return;
+			}
 		}
 		break;
 	case RIGHT:
 		x++;
 		if (x >= width)
 		{
-			isGameOver = true;
-			return;
+			if (wrapWalls)
+				x = 0;
+			else
+			{
+				isGameOver = true;
+				return;
+			}
 		}
 		break;
 	case UP:
 		y--;
 		if (y < 0)
 		{
-			isGameOver = true;
-			return;
+			if (wrapWalls)
+				y = height - 1;
+			else
+			{
+				isGameOver = true;
+				return;
+			}
 		}
 		break;
 	case DOWN:
 		y++;
 		if (y >= height)
 		{
-			isGameOver = true;
-			return;
+			if (wrapWalls)
+				y = 0;
+			else
+			{
+				isGameOver = true;
+				return;
+			}
 		}
 		break;
 	}
@@ -612,8 +696,9 @@ int main()
 
 	GameInit();
 
-	// Select difficulty before starting
+	// Select difficulty and mode before starting
 	unsigned int frameMs = SelectDifficulty();
+	wrapWalls = SelectMode();
 	enableRawMode();
 
 	while (true)
@@ -670,8 +755,11 @@ int main()
 
 		GameInit();
 
-		// Re-select difficulty on restart
+		GameInit();
+
+		// Re-select difficulty and mode on restart
 		frameMs = SelectDifficulty();
+		wrapWalls = SelectMode();
 		enableRawMode();
 	}
 
