@@ -36,6 +36,9 @@ int x, y;
 int fruitCordX, fruitCordY; 
 // variable to store the score of he player 
 int playerScore; 
+// variable to store the highest score
+int highScore = 0;
+string highScoreName = "";
 // Array to store the coordinates of snake tail (x-axis, 
 // y-axis) 
 int snakeTailX[100], snakeTailY[100]; 
@@ -89,7 +92,25 @@ void GameInit()
 bool PromptRestart()
 {
 	disableRawMode();
+	string currentPlayerName;
+	
+	cout << "Enter your name to record this score: ";
+	cin >> currentPlayerName;
+	cout << endl;
+	
 	cout << "Game Over! Final Score: " << playerScore << endl;
+	
+	// Check and update high score
+	if (playerScore > highScore) {
+		highScore = playerScore;
+		highScoreName = currentPlayerName;
+		cout << "*** NEW HIGH SCORE! ***" << endl;
+	} else {
+		cout << "Current Score: " << playerScore << " (" << currentPlayerName << ")" << endl;
+		cout << "High Score: " << highScore << " (" << highScoreName << ")" << endl;
+	}
+	cout << endl;
+	
 	if (use_fpga_switch) {
 		cout << "Restart? FPGA Switch 0 = restart, 2 = exit" << endl;
 	} else {
@@ -306,10 +327,6 @@ void enableRawMode() {
 // Main function / game looping function 
 int main() 
 { 
-	string playerName; 
-	cout << "enter your name: "; 
-	cin >> playerName;
-
 	// Try to open FPGA push switch device
 	fd_fpga_switch = open("/dev/fpga_push_switch", O_RDWR);
 	if (fd_fpga_switch >= 0) {
@@ -342,7 +359,7 @@ int main()
 	const unsigned int frameMs = 150; // milliseconds per movement update
 	while (true) {
 		while (!isGameOver) {
-			GameRender(playerName);
+			GameRender("Player");
 
 			// Interrupt switch is always checked first so it can pause/resume the game
 			if (use_interrupt_switch) {
