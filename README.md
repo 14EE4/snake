@@ -179,8 +179,10 @@ ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 ```bash
 cd ~/workspace/snake
-arm-linux-gnueabi-g++ snake.cpp buzzer.c -o snake -pthread -lm
+make snake
 ```
+
+`Makefile`은 `arm-linux-gnueabi-g++`와 `arm-linux-gnueabi-gcc`를 사용해서 `snake`, `buzzer_test`, `note_name_test`를 모두 빌드합니다.
 
 ## Deploy & Run (라즈베리파이)
 
