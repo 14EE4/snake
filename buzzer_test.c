@@ -77,6 +77,8 @@ static int play_sequence_file(int fd, const char *path)
 			continue;
 		}
 
+		char *rest_str = comma + 1;
+		char *duration_str = comma2 + 1;
 		*comma = '\0';
 		*comma2 = '\0';
 
@@ -84,12 +86,25 @@ static int play_sequence_file(int fd, const char *path)
 		char *rest_end = NULL;
 		char *duration_end = NULL;
 		long midi_note = strtol(p, &midi_end, 10);
-		double rest_ms = strtod(comma + 1, &rest_end);
-		double duration_ms = strtod(comma2 + 1, &duration_end);
-		if (midi_end == p || rest_end == comma + 1 || duration_end == comma2 + 1)
+		double rest_value = strtod(rest_str, &rest_end);
+		double duration_value = strtod(duration_str, &duration_end);
+		if (midi_end == p || rest_end == rest_str || duration_end == duration_str)
 		{
 			fprintf(stderr, "Skipping malformed line %d: %s", line_no, line);
 			continue;
+		}
+
+		double rest_ms = rest_value;
+		double duration_ms = duration_value;
+		if (strchr(rest_str, '.') || strchr(rest_str, 'e') || strchr(rest_str, 'E'))
+		{
+			if (rest_value > 0.0 && rest_value < 10.0)
+				rest_ms = rest_value * 1000.0;
+		}
+		if (strchr(duration_str, '.') || strchr(duration_str, 'e') || strchr(duration_str, 'E'))
+		{
+			if (duration_value > 0.0 && duration_value < 10.0)
+				duration_ms = duration_value * 1000.0;
 		}
 
 		int freq = 0;
