@@ -22,6 +22,28 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 - `fpga_push_switch`: major `265`
 - `fpga_fnd`: major `261`
 - `my_led_dev`: major `236` (interrupt switch)
+- `fpga_buzzer`: major `264`
+
+## Buzzer Test Example
+
+버저 드라이버는 1바이트 write/read 방식이므로, 아래 예제로 동작을 빠르게 확인할 수 있습니다.
+
+```bash
+# 장치 노드가 없다면 생성
+sudo mknod /dev/fpga_buzzer c 264 0
+sudo chmod 666 /dev/fpga_buzzer
+
+# 빌드
+gcc buzzer_test.c -o buzzer_test
+
+# 실행
+./buzzer_test on
+./buzzer_test off
+./buzzer_test pulse
+./buzzer_test blink 5 200
+```
+
+`on`은 1을 쓰고 1초 뒤 0으로 끄고, `blink`는 지정한 횟수만큼 켜기/끄기를 반복합니다. 실행 후 현재 상태를 read로 다시 읽어 콘솔에 출력합니다.
 
 ## FPGA Setup (라즈베리파이)
 
@@ -34,6 +56,7 @@ sudo insmod fpga_interface_driver.ko
 # 2) FPGA 디바이스 드라이버 로드
 sudo insmod fpga_push_switch_driver.ko
 sudo insmod fpga_fnd_driver.ko
+sudo insmod fpga_buzzer_driver.ko
 
 # 3) 인터럽트 스위치 드라이버 로드
 sudo insmod itr_driver.ko
@@ -41,21 +64,23 @@ sudo insmod itr_driver.ko
 # 4) FPGA 디바이스 노드 생성
 sudo mknod /dev/fpga_push_switch c 265 0
 sudo mknod /dev/fpga_fnd c 261 0
+sudo mknod /dev/fpga_buzzer c 264 0
 sudo mknod /dev/my_led_dev c 236 0
 
 # 5) 권한 부여
-sudo chmod 666 /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
+sudo chmod 666 /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 # 6) 모듈 로드 확인
 lsmod | grep -E "fpga|itr"
 dmesg | tail -20
 
 # 7) 디바이스 노드 확인
-ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
+ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 # 정상이면 이렇게 나옵니다:
 # crw-r--r-- 1 root root 265, 0 ... /dev/fpga_push_switch
 # crw-r--r-- 1 root root 261, 0 ... /dev/fpga_fnd
+# crw-r--r-- 1 root root 264, 0 ... /dev/fpga_buzzer
 # crw-r--r-- 1 root root 236, 0 ... /dev/my_led_dev
 ```
 
@@ -135,10 +160,11 @@ Restart? FPGA Switch 0 = restart, 2 = exit
 
 ```bash
 sudo rmmod itr_driver
+sudo rmmod fpga_buzzer_driver
 sudo rmmod fpga_fnd_driver
 sudo rmmod fpga_push_switch_driver
 sudo rmmod fpga_interface_driver
-sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
+sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 ```
 
 ## Control Methods (우선순위 순)
