@@ -93,6 +93,25 @@ void UpdateFNDScore(int score)
 	write(fd_fpga_fnd, fnd_value, 4);
 }
 
+static void PlayBuzzerTone(unsigned int freq, long duration_ms)
+{
+	if (fd_buzzer >= 0)
+		play_tone(fd_buzzer, freq, duration_ms);
+}
+
+static void PlayStartSound()
+{
+	PlayBuzzerTone(784, 90);
+	PlayBuzzerTone(988, 90);
+}
+
+static void PlayGameOverSound()
+{
+	PlayBuzzerTone(392, 120);
+	PlayBuzzerTone(294, 120);
+	PlayBuzzerTone(196, 180);
+}
+
 // Function to initialize game variables
 void GameInit()
 {
@@ -281,6 +300,8 @@ bool PromptRestart()
 {
 	disableRawMode();
 	string currentPlayerName;
+
+	PlayGameOverSound();
 
 	cout << "Enter your name to record this score: ";
 	cin >> currentPlayerName;
@@ -645,91 +666,106 @@ bool PauseMenu()
 	{
 		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
 	}
-	if (!use_fpga_switch)
+	if (use_interrupt_switch)
+	{
+		cout << "Interrupt Switch: toggle back to resume" << endl;
+	}
+	if (!use_fpga_switch && !use_interrupt_switch)
 	{
 		cout << "Keyboard: r = resume" << endl;
 	}
 
 	unsigned char prev_fpga[13] = {0};
-	unsigned char prev_sw = 0;
-
-	// If FPGA switches are available, handle ONLY Button 0(resume) and Button 2(exit).
-	if (use_fpga_switch && fd_fpga_switch >= 0)
+	bool prev_interrupt_state = false;
+	if (fd_sw >= 0)
 	{
-		// consume current state and wait for release if pressed
+		unsigned char sw_state = 0;
+		if (read(fd_sw, &sw_state, 1) > 0)
+		{
+			prev_interrupt_state = (sw_state != 0);
+		}
+	}
+	if (fd_fpga_switch >= 0)
+	{
 		unsigned char sw_state[13];
 		if (read(fd_fpga_switch, sw_state, 13) > 0)
 		{
 			memcpy(prev_fpga, sw_state, 13);
-			bool anyPressed = (prev_fpga[0] || prev_fpga[2]);
-			while (anyPressed)
-			{
-				if (read(fd_fpga_switch, sw_state, 13) > 0)
-				{
-					memcpy(prev_fpga, sw_state, 13);
-					anyPressed = (prev_fpga[0] || prev_fpga[2]);
-				}
-				std::this_thread::sleep_for(std::chrono::milliseconds(50));
-			}
-		}
-
-		while (true)
-		{
-			if (read(fd_fpga_switch, sw_state, 13) > 0)
-			{
-				// resume on rising edge of button 0
-				if (sw_state[0] && !prev_fpga[0])
-				{
-					enableRawMode();
-					return true;
-				}
-				// exit on rising edge of button 2
-				if (sw_state[2] && !prev_fpga[2])
-				{
-					return false;
-				}
-				memcpy(prev_fpga, sw_state, 13);
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
 		}
 	}
 
-	// If no FPGA push switch, fallback to keyboard only.
 	while (true)
 	{
-		// Check FPGA push switch (if present)
-		if (use_fpga_switch && fd_fpga_switch >= 0)
+		fd_set set;
+		FD_ZERO(&set);
+		int maxFd = -1;
+
+		if (fd_fpga_switch >= 0)
 		{
-			unsigned char sw_state[13];
-			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			FD_SET(fd_fpga_switch, &set);
+			if (fd_fpga_switch > maxFd)
+				maxFd = fd_fpga_switch;
+		}
+
+		if (fd_sw >= 0)
+		{
+			FD_SET(fd_sw, &set);
+			if (fd_sw > maxFd)
+				maxFd = fd_sw;
+		}
+
+		FD_SET(STDIN_FILENO, &set);
+		if (STDIN_FILENO > maxFd)
+			maxFd = STDIN_FILENO;
+
+		struct timeval tv;
+		tv.tv_sec = 0;
+		tv.tv_usec = 100000;
+
+		int ready = select(maxFd + 1, &set, NULL, NULL, &tv);
+		if (ready > 0)
+		{
+			if (fd_fpga_switch >= 0 && FD_ISSET(fd_fpga_switch, &set))
 			{
-				if (sw_state[0] && !prev_fpga[0])
+				unsigned char sw_state[13];
+				if (read(fd_fpga_switch, sw_state, 13) > 0)
+				{
+					if (sw_state[0] && !prev_fpga[0])
+					{
+						enableRawMode();
+						return true;
+					}
+					if (sw_state[2] && !prev_fpga[2])
+					{
+						return false;
+					}
+					memcpy(prev_fpga, sw_state, 13);
+				}
+			}
+
+			if (fd_sw >= 0 && FD_ISSET(fd_sw, &set))
+			{
+				unsigned char sw_state = 0;
+				if (read(fd_sw, &sw_state, 1) > 0)
+				{
+					bool current_interrupt_state = (sw_state != 0);
+					if (current_interrupt_state && !prev_interrupt_state)
+					{
+						enableRawMode();
+						return true;
+					}
+					prev_interrupt_state = current_interrupt_state;
+				}
+			}
+
+			if (FD_ISSET(STDIN_FILENO, &set))
+			{
+				int c = getchar();
+				if (c == 'r' || c == 'R')
 				{
 					enableRawMode();
 					return true;
 				}
-				if (sw_state[2] && !prev_fpga[2])
-				{
-					return false;
-				}
-				memcpy(prev_fpga, sw_state, 13);
-			}
-		}
-
-		// Check keyboard input
-		fd_set set;
-		struct timeval tv;
-		FD_ZERO(&set);
-		FD_SET(STDIN_FILENO, &set);
-		tv.tv_sec = 0;
-		tv.tv_usec = 100000; // 100ms
-		if (select(STDIN_FILENO + 1, &set, NULL, NULL, &tv) > 0)
-		{
-			int c = getchar();
-			if (c == 'r' || c == 'R')
-			{
-				enableRawMode();
-				return true;
 			}
 		}
 
@@ -811,6 +847,7 @@ int main()
 	unsigned int frameMs = SelectDifficulty();
 	wrapWalls = SelectMode();
 	enableRawMode();
+	PlayStartSound();
 
 	while (true)
 	{
@@ -870,6 +907,7 @@ int main()
 		frameMs = SelectDifficulty();
 		wrapWalls = SelectMode();
 		enableRawMode();
+		PlayStartSound();
 	}
 
 	// Close devices if opened
