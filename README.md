@@ -37,7 +37,7 @@ sudo mknod /dev/fpga_buzzer c 264 0
 sudo chmod 666 /dev/fpga_buzzer
 
 # 빌드 (로컬이나 라즈베리파이에서)
-gcc buzzer_test.c -o buzzer_test -lm
+gcc buzzer_test.c -o buzzer_test
 ```
 
 기본 사용법
@@ -74,13 +74,13 @@ gcc buzzer_test.c -o buzzer_test -lm
 
 ```bash
 # 네이티브(라즈베리파이 또는 리눅스 호스트) 빌드
-gcc buzzer_test.c -o buzzer_test -lm
+gcc buzzer_test.c -o buzzer_test
 
 # 크로스 컴파일(예: x86에서 ARM 타겟 빌드)
-arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -lm -pthread
+arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -pthread
 ```
 
-참고: 현재 `note_name_to_frequency`는 테이블 기반이라 `pow()`에 의존하지 않습니다. 다만 예전 빌드나 확장 코드에서 수학 함수를 추가로 쓰는 경우를 대비해 `-lm`을 붙여 두었습니다.
+참고: 현재 `note_name_to_frequency`는 테이블 기반이라 `pow()`에 의존하지 않습니다. 그래서 `-lm`은 더 이상 필요하지 않습니다.
 
 `play_tone` 함수 사용법
 
