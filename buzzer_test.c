@@ -33,6 +33,32 @@ static int read_value(int fd, unsigned char *value)
 	return 0;
 }
 
+static int play_tone(int fd, unsigned int freq, long duration_ms)
+{
+	if (freq < 20 || freq > 20000) return -1;
+
+	unsigned int half_period_us = 500000 / freq; // 1/(2*f) in us
+	struct timespec start, now;
+	long elapsed_us = 0;
+	long target_us = duration_ms * 1000L;
+
+	clock_gettime(CLOCK_MONOTONIC, &start);
+
+	while (elapsed_us < target_us)
+	{
+		if (write_value(fd, 1) != 0) break;
+		usleep(half_period_us);
+		if (write_value(fd, 0) != 0) break;
+		usleep(half_period_us);
+
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_nsec - start.tv_nsec) / 1000L;
+	}
+
+	write_value(fd, 0);
+	return 0;
+}
+
 static void usage(const char *prog)
 {
 	printf("Usage: %s [on|off|pulse|blink] [count] [delay_ms]\n", prog);
@@ -175,26 +201,7 @@ int main(int argc, char *argv[])
 		if (freq < 20) freq = 20;
 		if (freq > 20000) freq = 20000;
 
-		unsigned int half_period_us = 500000 / (unsigned int)freq; // 1/(2*f) in us
-
-		struct timespec start, now;
-		long elapsed_us = 0;
-		long target_us = (long)duration_ms * 1000L;
-
-		clock_gettime(CLOCK_MONOTONIC, &start);
-
-		while (elapsed_us < target_us)
-		{
-			if (write_value(fd, 1) != 0) break;
-			usleep(half_period_us);
-			if (write_value(fd, 0) != 0) break;
-			usleep(half_period_us);
-
-			clock_gettime(CLOCK_MONOTONIC, &now);
-			elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_nsec - start.tv_nsec) / 1000L;
-		}
-
-		write_value(fd, 0);
+		play_tone(fd, (unsigned int)freq, duration_ms);
 	}
 	else if (strcmp(mode, "note") == 0)
 	{
@@ -206,20 +213,7 @@ int main(int argc, char *argv[])
 			if (note_name_to_frequency(argv[2], &freq) == 0) {
 				if (argc > 3) duration_ms = atoi(argv[3]);
 				if (duration_ms <= 0) duration_ms = 500;
-				unsigned int half_period_us = 500000 / (unsigned int)freq;
-				struct timespec start, now;
-				long elapsed_us = 0;
-				long target_us = (long)duration_ms * 1000L;
-				clock_gettime(CLOCK_MONOTONIC, &start);
-				while (elapsed_us < target_us) {
-					if (write_value(fd, 1) != 0) break;
-					usleep(half_period_us);
-					if (write_value(fd, 0) != 0) break;
-					usleep(half_period_us);
-					clock_gettime(CLOCK_MONOTONIC, &now);
-					elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_nsec - start.tv_nsec) / 1000L;
-				}
-				write_value(fd, 0);
+				play_tone(fd, (unsigned int)freq, duration_ms);
 			} else {
 				fprintf(stderr, "Invalid note name: %s\n", argv[2]);
 			}
@@ -234,20 +228,7 @@ int main(int argc, char *argv[])
 		for (int i = 0; i < notes; ++i) {
 			int freq = 0;
 			if (note_name_to_frequency(scale[i], &freq) != 0) continue;
-			unsigned int half_period_us = 500000 / (unsigned int)freq;
-			struct timespec start, now;
-			long elapsed_us = 0;
-			long target_us = (long)duration_ms * 1000L;
-			clock_gettime(CLOCK_MONOTONIC, &start);
-			while (elapsed_us < target_us) {
-				if (write_value(fd, 1) != 0) break;
-				usleep(half_period_us);
-				if (write_value(fd, 0) != 0) break;
-				usleep(half_period_us);
-				clock_gettime(CLOCK_MONOTONIC, &now);
-				elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_nsec - start.tv_nsec) / 1000L;
-			}
-			write_value(fd, 0);
+			play_tone(fd, (unsigned int)freq, duration_ms);
 			usleep((useconds_t)gap_ms * 1000);
 		}
 	}
