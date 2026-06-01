@@ -345,6 +345,7 @@ bool PromptRestart()
 				}
 				if (sw_state[2])
 				{
+					PlayGameOverSound();
 					return false;
 				}
 			}
@@ -364,6 +365,7 @@ bool PromptRestart()
 
 			if (choice == 'n' || choice == 'N')
 			{
+				PlayGameOverSound();
 				return false;
 			}
 
@@ -737,6 +739,7 @@ bool PauseMenu()
 					}
 					if (sw_state[2] && !prev_fpga[2])
 					{
+						PlayGameOverSound();
 						return false;
 					}
 					memcpy(prev_fpga, sw_state, 13);
