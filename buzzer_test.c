@@ -9,8 +9,6 @@
 #define BUZZER_DEVICE "/dev/fpga_buzzer"
 #define BUZZER_ON_DURATION_US 200000
 #define DEFAULT_SEQ_FILE "out.seq"
-#define DEFAULT_SEQ_SHORT_MS 120
-#define DEFAULT_SEQ_LONG_MS 240
 #define DEFAULT_SEQ_GAP_MS 20
 
 static void usage(const char *prog)
@@ -23,12 +21,12 @@ static void usage(const char *prog)
 	printf("  tone    : generate a tone: tone <freq_hz> <duration_ms>\n");
 	printf("  note    : play musical note: note <note_name> <duration_ms> (e.g. C4, A3, G#5)\n");
 	printf("  test    : play C major scale (C4 D4 E4 F4 G4 A4 B4 C5)\n");
-	printf("  seq     : play a sequence file: seq [path] [short_ms] [long_ms] [gap_ms]\n");
+	printf("  seq     : play a sequence file: seq [path]\n");
 }
 
 // note_name_to_frequency and play_tone are provided in buzzer.c via buzzer.h
 
-static int play_sequence_file(int fd, const char *path, int short_ms, int long_ms, int gap_ms)
+static int play_sequence_file(int fd, const char *path)
 {
 	FILE *fp = fopen(path, "r");
 	if (!fp)
@@ -49,18 +47,23 @@ static int play_sequence_file(int fd, const char *path, int short_ms, int long_m
 			continue;
 
 		char *comma = strchr(p, ',');
-		if (!comma)
+		char *comma2 = comma ? strchr(comma + 1, ',') : NULL;
+		if (!comma || !comma2)
 		{
 			fprintf(stderr, "Skipping malformed line %d: %s", line_no, line);
 			continue;
 		}
 
 		*comma = '\0';
+		*comma2 = '\0';
+
 		char *midi_end = NULL;
-		char *gate_end = NULL;
+		char *rest_end = NULL;
+		char *duration_end = NULL;
 		long midi_note = strtol(p, &midi_end, 10);
-		long gate = strtol(comma + 1, &gate_end, 10);
-		if (midi_end == p || gate_end == comma + 1)
+		double rest_ms = strtod(comma + 1, &rest_end);
+		double duration_ms = strtod(comma2 + 1, &duration_end);
+		if (midi_end == p || rest_end == comma + 1 || duration_end == comma2 + 1)
 		{
 			fprintf(stderr, "Skipping malformed line %d: %s", line_no, line);
 			continue;
@@ -73,13 +76,13 @@ static int play_sequence_file(int fd, const char *path, int short_ms, int long_m
 			continue;
 		}
 
-		int duration_ms = (gate != 0) ? long_ms : short_ms;
-		if (duration_ms <= 0)
-			duration_ms = short_ms > 0 ? short_ms : 100;
+		if (rest_ms > 0.0)
+			usleep((useconds_t)(rest_ms * 1000.0 + 0.5));
 
-		play_tone(fd, (unsigned int)freq, duration_ms);
-		if (gap_ms > 0)
-			usleep((useconds_t)gap_ms * 1000);
+		if (duration_ms <= 0.0)
+			duration_ms = 100.0;
+
+		play_tone_seconds(fd, (unsigned int)freq, duration_ms / 1000.0);
 	}
 
 	fclose(fp);
@@ -153,18 +156,8 @@ int main(int argc, char *argv[])
 	else if (strcmp(mode, "seq") == 0)
 	{
 		const char *path = (argc > 2) ? argv[2] : DEFAULT_SEQ_FILE;
-		int short_ms = (argc > 3) ? atoi(argv[3]) : DEFAULT_SEQ_SHORT_MS;
-		int long_ms = (argc > 4) ? atoi(argv[4]) : DEFAULT_SEQ_LONG_MS;
-		int gap_ms = (argc > 5) ? atoi(argv[5]) : DEFAULT_SEQ_GAP_MS;
-
-		if (short_ms <= 0)
-			short_ms = DEFAULT_SEQ_SHORT_MS;
-		if (long_ms <= 0)
-			long_ms = DEFAULT_SEQ_LONG_MS;
-		if (gap_ms < 0)
-			gap_ms = DEFAULT_SEQ_GAP_MS;
-
-		play_sequence_file(fd, path, short_ms, long_ms, gap_ms);
+		(void)argc;
+		play_sequence_file(fd, path);
 	}
 	else if (strcmp(mode, "tone") == 0)
 	{

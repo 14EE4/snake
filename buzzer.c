@@ -47,12 +47,18 @@ int read_value(int fd, unsigned char *value)
 
 int play_tone(int fd, unsigned int freq, long duration_ms)
 {
+    return play_tone_seconds(fd, freq, (double)duration_ms / 1000.0);
+}
+
+int play_tone_seconds(int fd, unsigned int freq, double duration_s)
+{
     if (freq < 20 || freq > 20000) return -1;
+    if (duration_s <= 0.0) return -1;
 
     unsigned int half_period_us = 500000 / freq; // 1/(2*f) in us
     struct timespec start, now;
     long elapsed_us = 0;
-    long target_us = duration_ms * 1000L;
+    long target_us = (long)(duration_s * 1000000.0 + 0.5);
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
