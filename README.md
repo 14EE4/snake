@@ -26,24 +26,50 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 
 ## Buzzer Test Example
 
-버저 드라이버는 1바이트 write/read 방식이므로, 아래 예제로 동작을 빠르게 확인할 수 있습니다.
+버저 드라이버는 1바이트 write/read 방식입니다. 포함된 테스트 유틸리티 `buzzer_test` 로 여러 동작을 확인할 수 있습니다.
+
+빌드 및 준비
 
 ```bash
-# 장치 노드가 없다면 생성
+# (라즈베리파이에서) 모듈을 삽입한 뒤 장치 노드 생성
+sudo insmod fpga_buzzer_driver.ko
 sudo mknod /dev/fpga_buzzer c 264 0
 sudo chmod 666 /dev/fpga_buzzer
 
-# 빌드
-gcc buzzer_test.c -o buzzer_test
-
-# 실행
-./buzzer_test on
-./buzzer_test off
-./buzzer_test pulse
-./buzzer_test blink 5 200
+# 빌드 (로컬이나 라즈베리파이에서)
+gcc buzzer_test.c -o buzzer_test -lm
 ```
 
-`on`은 1을 쓰고 1초 뒤 0으로 끄고, `blink`는 지정한 횟수만큼 켜기/끄기를 반복합니다. 실행 후 현재 상태를 read로 다시 읽어 콘솔에 출력합니다.
+기본 사용법
+
+```bash
+./buzzer_test on               # 짧게 켰다가 끕니다 (기본 200ms)
+./buzzer_test off              # 끕니다
+./buzzer_test pulse            # 짧은 펄스 (기본 약 150ms)
+./buzzer_test blink <n> <ms>   # n회 깜빡임, 각 on/off 지연(ms)
+./buzzer_test tone <hz> <ms>   # 지정 주파수(hz)를 duration(ms)만큼 재생
+./buzzer_test note <name> <ms> # 음계 이름(C4, A3, G#5 등)을 duration(ms)만큼 재생
+./buzzer_test test             # C major 스케일(C4..C5)을 연주
+```
+
+예시
+
+```bash
+./buzzer_test tone 440 500    # 440Hz를 500ms 재생 (A4)
+./buzzer_test note C4 300     # C4(약 261Hz)를 300ms 재생
+./buzzer_test blink 5 200     # 5회 200ms 간격으로 on/off
+./buzzer_test test            # 도레미파솔라시도 재생
+```
+
+설명 및 제약
+
+- `tone` 모드는 직접 주파수를 받습니다. 유저스페이스 타이머 정밀도의 한계로 매우 높은 주파수나 정밀 주파수 제어에는 한계가 있습니다.
+- `note` 모드는 `A4 = 440Hz` 기준으로 음계 이름을 계산합니다. 지원 예: `C4`, `G#4` (또는 `Ab4`), `A3` 등. 옥타브 숫자를 반드시 포함해야 합니다.
+- 주파수 범위: 내부에서 20Hz ~ 20000Hz 로 제한합니다.
+- 볼륨(실제 음량) 제어는 하드웨어(버저 회로)나 FPGA 쪽 PWM/증폭기 설계가 필요합니다. 유저스페이스에서는 듀티비 조작으로 감지상 음량을 낮출 수 있으나 효과는 하드웨어에 따라 다릅니다.
+
+빠른 확인: 장치를 올바르게 로드하면 `ls -l /dev/fpga_buzzer` 로 존재를 확인하고, `dmesg`에 관련 로그가 남을 수 있습니다.
+
 
 ## FPGA Setup (라즈베리파이)
 
