@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <time.h>
 #include <math.h>
+#include <ctype.h>
 
 #define BUZZER_DEVICE "/dev/fpga_buzzer"
 #define BUZZER_ON_DURATION_US 200000
@@ -48,31 +49,29 @@ static int note_name_to_frequency(const char *name, int *out_freq)
 {
 	if (!name || !out_freq) return -1;
 
-	// Parse note: letter A-G, optional # or b, octave number (e.g. C4, A#3, Db5)
-	char note = '\0';
-	int accidental = 0; // +1 for sharp, -1 for flat
-	int octave = 4; // default
-
+	// Robust parse: skip leading whitespace, accept note letter, optional accidental, then octave digits
 	const char *p = name;
-	if (*p >= 'a' && *p <= 'g') note = *p - 'a' + 'A';
-	else if (*p >= 'A' && *p <= 'G') note = *p;
-	else return -1;
+	while (*p && isspace((unsigned char)*p)) p++;
+	if (!*p) return -1;
+
+	char c = *p;
+	if (c >= 'a' && c <= 'g') c = c - 'a' + 'A';
+	if (c < 'A' || c > 'G') return -1;
+	char note = c;
 	p++;
 
+	int accidental = 0; // +1 for sharp, -1 for flat
 	if (*p == '#' || *p == 's' || *p == 'S') { accidental = 1; p++; }
 	else if (*p == 'b' || *p == 'B' || *p == 'f' || *p == 'F') { accidental = -1; p++; }
 
-	if (*p == '+' || *p == '-') { // not expected
-		return -1;
-	}
+	while (*p && isspace((unsigned char)*p)) p++;
+	if (!*p) return -1;
 
-	if (*p == '\0') return -1;
-
-	// Read octave (may be multi-digit)
+	// Read octave (may be multi-digit, allow optional sign)
 	char *endptr = NULL;
 	long oct = strtol(p, &endptr, 10);
 	if (endptr == p) return -1;
-	octave = (int)oct;
+	int octave = (int)oct;
 
 	// Map note letter to semitone offset relative to A in the same octave
 	int semitone_from_A = 0;
