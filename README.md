@@ -80,7 +80,7 @@ gcc buzzer_test.c -o buzzer_test -lm
 arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -lm -pthread
 ```
 
-참고: `note` 기능에서 `pow()`를 사용하므로 링크 시 수학 라이브러리 `libm`을 포함해야 합니다(`-lm`). 크로스 툴체인에서 `libm`이 누락되면 관련 libc 개발 패키지(예: `libc6-dev-armhf-cross` 등)를 설치해야 합니다.
+참고: 현재 `note_name_to_frequency`는 테이블 기반이라 `pow()`에 의존하지 않습니다. 다만 예전 빌드나 확장 코드에서 수학 함수를 추가로 쓰는 경우를 대비해 `-lm`을 붙여 두었습니다.
 
 `play_tone` 함수 사용법
 
@@ -134,6 +134,13 @@ int main(void) {
 버저 장치가 없으면 게임은 계속 동작하고, 소리만 비활성화됩니다.
 
 일시 정지는 interrupt switch로 토글되고, 다시 같은 스위치를 뒤집으면 resume됩니다.
+
+## Troubleshooting
+
+- WSL에서 `make`로 ARM 크로스컴파일한 뒤 Pi에서 `./note_name_test`를 실행했는데 `parse error`가 나면, 먼저 Pi에서 실행한 바이너리가 최신 빌드인지 확인합니다.
+- 이 프로젝트의 `note_name_to_frequency`는 현재 테이블 기반 구현이라 WSL/Pi에서 같은 결과가 나와야 합니다. 실제로는 오래된 바이너리를 실행했거나, 소스 복사 후 재빌드를 안 한 경우가 대부분입니다.
+- 확인 순서: `make clean && make note_name_test`로 다시 빌드한 뒤 Pi로 복사하고, `./note_name_test`를 다시 실행합니다.
+- 테스트용 `note_name_test`는 `/dev/fpga_buzzer`가 없어도 동작합니다. 소리 재생 확인이 필요할 때만 `buzzer_test note ...` 또는 `buzzer_test test`를 사용합니다.
 
 
 ## FPGA Setup (라즈베리파이)
