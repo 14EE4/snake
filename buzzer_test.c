@@ -123,6 +123,8 @@ static int play_sequence_file(int fd, const char *path)
 		if (duration_ms <= 0.0)
 			duration_ms = 100.0;
 
+		fprintf(stderr, "seq line %d: note=%ld freq=%d rest=%.3fms length=%.3fms\n",
+			line_no, midi_note, freq, rest_ms, duration_ms);
 		play_tone_seconds(fd, (unsigned int)freq, duration_ms / 1000.0);
 		if (g_stop_requested)
 			break;
