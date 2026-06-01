@@ -15,6 +15,8 @@
 
 using namespace std;
 
+#include "buzzer.h"
+
 // height and width of the boundary
 const int width = 80;
 const int height = 20;
@@ -29,6 +31,8 @@ int fd_fpga_fnd = -1;
 // Interrupt switch device
 int fd_sw = -1;
 bool use_interrupt_switch = false;
+// Buzzer device
+int fd_buzzer = -1;
 
 // Snake head coordinates of snake (x-axis, y-axis)
 int x, y;
@@ -443,6 +447,7 @@ void UpdateGame()
 				x = width - 1;
 			else
 			{
+				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
 				isGameOver = true;
 				return;
 			}
@@ -456,6 +461,7 @@ void UpdateGame()
 				x = 0;
 			else
 			{
+				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
 				isGameOver = true;
 				return;
 			}
@@ -469,6 +475,7 @@ void UpdateGame()
 				y = height - 1;
 			else
 			{
+				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
 				isGameOver = true;
 				return;
 			}
@@ -482,6 +489,7 @@ void UpdateGame()
 				y = 0;
 			else
 			{
+				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
 				isGameOver = true;
 				return;
 			}
@@ -506,7 +514,10 @@ void UpdateGame()
 	for (int i = 0; i < snakeTailLen; i++)
 	{
 		if (snakeTailX[i] == x && snakeTailY[i] == y)
+		{
+			if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 400);
 			isGameOver = true;
+		}
 	}
 
 	// Checks for snake's collision with the food (#)
@@ -524,6 +535,12 @@ void UpdateGame()
 			slowFruitX = rand() % width;
 			slowFruitY = rand() % height;
 		}
+		// Play eat sound
+		if (fd_buzzer >= 0)
+		{
+			play_tone(fd_buzzer, 880, 100);
+			play_tone(fd_buzzer, 1100, 80);
+		}
 	}
 
 	// Checks for snake's collision with slow fruit (*)
@@ -534,6 +551,9 @@ void UpdateGame()
 		UpdateFNDScore(playerScore);
 		slowFruitActive = false;
 		slowEffectTicks = SLOW_DURATION;
+		// Play slow-fruit sound (lower tone)
+		if (fd_buzzer >= 0)
+			play_tone(fd_buzzer, 660, 140);
 	}
 
 	// Decrement slow effect
@@ -774,6 +794,17 @@ int main()
 		cout << "Interrupt switch device not found." << endl;
 	}
 
+	// Try to open buzzer device (optional)
+	fd_buzzer = open("/dev/fpga_buzzer", O_RDWR);
+	if (fd_buzzer >= 0)
+	{
+		cout << "FPGA buzzer device opened successfully!" << endl;
+	}
+	else
+	{
+		cout << "FPGA buzzer device not found (sound disabled)." << endl;
+	}
+
 	GameInit();
 
 	// Select difficulty and mode before starting
@@ -848,6 +879,8 @@ int main()
 		close(fd_fpga_fnd);
 	if (fd_sw >= 0)
 		close(fd_sw);
+	if (fd_buzzer >= 0)
+		close(fd_buzzer);
 
 	return 0;
 }

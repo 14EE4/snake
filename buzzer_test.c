@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
 		const char *scale[] = {"C4","D4","E4","F4","G4","A4","B4","C5"};
 		int notes = sizeof(scale) / sizeof(scale[0]);
 		int duration_ms = 100;
-		int gap_ms = 50;
+		int gap_ms = 5;
 		for (int i = 0; i < notes; ++i) {
 			int freq = 0;
 			if (note_name_to_frequency(scale[i], &freq) != 0) continue;
