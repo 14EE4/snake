@@ -7,7 +7,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <time.h>
-#include <math.h>
 #include <ctype.h>
 
 int write_value(int fd, unsigned char value)
@@ -101,11 +100,48 @@ int note_name_to_frequency(const char *name, int *out_freq)
 
     semitone_from_A += accidental;
 
-    // Compute semitone distance from A4
-    int semitone_distance = semitone_from_A + (octave - 4) * 12;
+    // Use a deterministic lookup table for equal-tempered notes.
+    // Columns: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+    static const int frequency_table[9][12] = {
+        {16, 17, 18, 19, 21, 22, 23, 25, 26, 28, 29, 31},
+        {33, 35, 37, 39, 41, 44, 46, 49, 52, 55, 58, 62},
+        {65, 69, 73, 78, 82, 87, 92, 98, 104, 110, 117, 123},
+        {131, 139, 147, 156, 165, 175, 185, 196, 208, 220, 233, 247},
+        {262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494},
+        {523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988},
+        {1047, 1109, 1175, 1245, 1319, 1397, 1480, 1568, 1661, 1760, 1865, 1976},
+        {2093, 2217, 2349, 2489, 2637, 2794, 2960, 3136, 3322, 3520, 3729, 3951},
+        {4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902}
+    };
 
-    double freq = 440.0 * pow(2.0, semitone_distance / 12.0);
-    if (freq < 1.0) return -1;
-    *out_freq = (int)(freq + 0.5);
+    int note_index = -1;
+    switch (note)
+    {
+        case 'C': note_index = 0; break;
+        case 'D': note_index = 2; break;
+        case 'E': note_index = 4; break;
+        case 'F': note_index = 5; break;
+        case 'G': note_index = 7; break;
+        case 'A': note_index = 9; break;
+        case 'B': note_index = 11; break;
+        default: return -1;
+    }
+
+    note_index += accidental;
+    if (note_index < 0)
+    {
+        note_index += 12;
+        octave -= 1;
+    }
+    if (note_index >= 12)
+    {
+        note_index -= 12;
+        octave += 1;
+    }
+
+    if (octave < 0 || octave > 8)
+        return -1;
+
+    *out_freq = frequency_table[octave][note_index];
     return 0;
 }
