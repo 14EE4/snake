@@ -82,6 +82,44 @@ arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -lm -pthread
 
 참고: `note` 기능에서 `pow()`를 사용하므로 링크 시 수학 라이브러리 `libm`을 포함해야 합니다(`-lm`). 크로스 툴체인에서 `libm`이 누락되면 관련 libc 개발 패키지(예: `libc6-dev-armhf-cross` 등)를 설치해야 합니다.
 
+`play_tone` 함수 사용법
+
+`buzzer_test.c`에는 내부적으로 재사용 가능한 `play_tone` 헬퍼가 있습니다. 다른 C 프로그램에서 동일한 패턴으로 음을 재생하려면 이 함수를 복사해서 사용하거나 `buzzer_test.c`의 구현을 참조하세요.
+
+함수 시그니처:
+
+```c
+// fd: 열린 /dev/fpga_buzzer 파일 디스크립터
+// freq: 재생할 주파수(Hz)
+// duration_ms: 재생 시간(밀리초)
+static int play_tone(int fd, unsigned int freq, long duration_ms);
+```
+
+간단한 사용 예제:
+
+```c
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+
+extern int play_tone(int fd, unsigned int freq, long duration_ms); // 또는 buzzer_test.c 내부 복사
+
+int main(void) {
+	int fd = open("/dev/fpga_buzzer", O_RDWR);
+	if (fd < 0) { perror("open"); return 1; }
+
+	// A4(440Hz)를 500ms 재생
+	play_tone(fd, 440, 500);
+
+	close(fd);
+	return 0;
+}
+```
+
+주의:
+- `play_tone`은 사용자공간에서 사각파를 생성하기 위해 `write(1)/write(0)`를 빠르게 반복합니다. 높은 주파수에서 타이밍 정확도는 제한될 수 있습니다.
+- 실제 프로젝트에서 재사용 시에는 `play_tone` 구현을 모듈화하거나, 정밀 제어가 필요하면 드라이버/FPGA 쪽 PWM 생성을 고려하세요.
+
 
 ## FPGA Setup (라즈베리파이)
 
