@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #define BUZZER_DEVICE "/dev/fpga_buzzer"
+#define BUZZER_ON_DURATION_US 200000
 
 static int write_value(int fd, unsigned char value)
 {
@@ -32,7 +33,7 @@ static int read_value(int fd, unsigned char *value)
 static void usage(const char *prog)
 {
 	printf("Usage: %s [on|off|pulse|blink] [count] [delay_ms]\n", prog);
-	printf("  on      : write 1 to the buzzer and keep it on for one second\n");
+	printf("  on      : write 1 to the buzzer and keep it on for 200ms\n");
 	printf("  off     : write 0 to the buzzer\n");
 	printf("  pulse   : write 1 briefly, then write 0\n");
 	printf("  blink   : repeat 1/0 toggling (default count=3, delay_ms=300)\n");
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
 		{
 			if (read_value(fd, &value) == 0)
 				printf("Buzzer state read back: %u\n", value);
-			sleep(1);
+			usleep(BUZZER_ON_DURATION_US);
 			write_value(fd, 0);
 		}
 	}
