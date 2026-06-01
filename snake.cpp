@@ -15,6 +15,8 @@
 
 using namespace std;
 
+#include "buzzer.h"
+
 // height and width of the boundary
 const int width = 80;
 const int height = 20;
@@ -29,6 +31,8 @@ int fd_fpga_fnd = -1;
 // Interrupt switch device
 int fd_sw = -1;
 bool use_interrupt_switch = false;
+// Buzzer device
+int fd_buzzer = -1;
 
 // Snake head coordinates of snake (x-axis, y-axis)
 int x, y;
@@ -87,6 +91,29 @@ void UpdateFNDScore(int score)
 	fnd_value[3] = score % 10;
 
 	write(fd_fpga_fnd, fnd_value, 4);
+}
+
+static void PlayBuzzerNote(const char *note_name, long duration_ms)
+{
+	if (fd_buzzer < 0)
+		return;
+
+	int freq = 0;
+	if (note_name_to_frequency(note_name, &freq) == 0)
+		play_tone(fd_buzzer, (unsigned int)freq, duration_ms);
+}
+
+static void PlayStartSound()
+{
+	PlayBuzzerNote("G5", 90);
+	PlayBuzzerNote("B5", 90);
+}
+
+static void PlayGameOverSound()
+{
+	PlayBuzzerNote("G4", 120);
+	PlayBuzzerNote("D4", 120);
+	PlayBuzzerNote("G3", 180);
 }
 
 // Function to initialize game variables
@@ -278,6 +305,8 @@ bool PromptRestart()
 	disableRawMode();
 	string currentPlayerName;
 
+	PlayGameOverSound();
+
 	cout << "Enter your name to record this score: ";
 	cin >> currentPlayerName;
 	cout << endl;
@@ -320,6 +349,7 @@ bool PromptRestart()
 				}
 				if (sw_state[2])
 				{
+					PlayGameOverSound();
 					return false;
 				}
 			}
@@ -339,6 +369,7 @@ bool PromptRestart()
 
 			if (choice == 'n' || choice == 'N')
 			{
+				PlayGameOverSound();
 				return false;
 			}
 
@@ -443,6 +474,7 @@ void UpdateGame()
 				x = width - 1;
 			else
 			{
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -456,6 +488,7 @@ void UpdateGame()
 				x = 0;
 			else
 			{
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -469,6 +502,7 @@ void UpdateGame()
 				y = height - 1;
 			else
 			{
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -482,6 +516,7 @@ void UpdateGame()
 				y = 0;
 			else
 			{
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -506,7 +541,10 @@ void UpdateGame()
 	for (int i = 0; i < snakeTailLen; i++)
 	{
 		if (snakeTailX[i] == x && snakeTailY[i] == y)
+		{
+			PlayBuzzerNote("A2", 400);
 			isGameOver = true;
+		}
 	}
 
 	// Checks for snake's collision with the food (#)
@@ -524,6 +562,12 @@ void UpdateGame()
 			slowFruitX = rand() % width;
 			slowFruitY = rand() % height;
 		}
+		// Play eat sound
+		if (fd_buzzer >= 0)
+		{
+			PlayBuzzerNote("A5", 100);
+			PlayBuzzerNote("C#6", 80);
+		}
 	}
 
 	// Checks for snake's collision with slow fruit (*)
@@ -534,6 +578,8 @@ void UpdateGame()
 		UpdateFNDScore(playerScore);
 		slowFruitActive = false;
 		slowEffectTicks = SLOW_DURATION;
+		// Play slow-fruit sound (lower tone)
+		PlayBuzzerNote("E5", 140);
 	}
 
 	// Decrement slow effect
@@ -625,91 +671,107 @@ bool PauseMenu()
 	{
 		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
 	}
-	if (!use_fpga_switch)
+	if (use_interrupt_switch)
+	{
+		cout << "Interrupt Switch: toggle back to resume" << endl;
+	}
+	if (!use_fpga_switch && !use_interrupt_switch)
 	{
 		cout << "Keyboard: r = resume" << endl;
 	}
 
 	unsigned char prev_fpga[13] = {0};
-	unsigned char prev_sw = 0;
-
-	// If FPGA switches are available, handle ONLY Button 0(resume) and Button 2(exit).
-	if (use_fpga_switch && fd_fpga_switch >= 0)
+	bool prev_interrupt_state = false;
+	if (fd_sw >= 0)
 	{
-		// consume current state and wait for release if pressed
+		unsigned char sw_state = 0;
+		if (read(fd_sw, &sw_state, 1) > 0)
+		{
+			prev_interrupt_state = (sw_state != 0);
+		}
+	}
+	if (fd_fpga_switch >= 0)
+	{
 		unsigned char sw_state[13];
 		if (read(fd_fpga_switch, sw_state, 13) > 0)
 		{
 			memcpy(prev_fpga, sw_state, 13);
-			bool anyPressed = (prev_fpga[0] || prev_fpga[2]);
-			while (anyPressed)
-			{
-				if (read(fd_fpga_switch, sw_state, 13) > 0)
-				{
-					memcpy(prev_fpga, sw_state, 13);
-					anyPressed = (prev_fpga[0] || prev_fpga[2]);
-				}
-				std::this_thread::sleep_for(std::chrono::milliseconds(50));
-			}
-		}
-
-		while (true)
-		{
-			if (read(fd_fpga_switch, sw_state, 13) > 0)
-			{
-				// resume on rising edge of button 0
-				if (sw_state[0] && !prev_fpga[0])
-				{
-					enableRawMode();
-					return true;
-				}
-				// exit on rising edge of button 2
-				if (sw_state[2] && !prev_fpga[2])
-				{
-					return false;
-				}
-				memcpy(prev_fpga, sw_state, 13);
-			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(50));
 		}
 	}
 
-	// If no FPGA push switch, fallback to keyboard only.
 	while (true)
 	{
-		// Check FPGA push switch (if present)
-		if (use_fpga_switch && fd_fpga_switch >= 0)
+		fd_set set;
+		FD_ZERO(&set);
+		int maxFd = -1;
+
+		if (fd_fpga_switch >= 0)
 		{
-			unsigned char sw_state[13];
-			if (read(fd_fpga_switch, sw_state, 13) > 0)
+			FD_SET(fd_fpga_switch, &set);
+			if (fd_fpga_switch > maxFd)
+				maxFd = fd_fpga_switch;
+		}
+
+		if (fd_sw >= 0)
+		{
+			FD_SET(fd_sw, &set);
+			if (fd_sw > maxFd)
+				maxFd = fd_sw;
+		}
+
+		FD_SET(STDIN_FILENO, &set);
+		if (STDIN_FILENO > maxFd)
+			maxFd = STDIN_FILENO;
+
+		struct timeval tv;
+		tv.tv_sec = 0;
+		tv.tv_usec = 100000;
+
+		int ready = select(maxFd + 1, &set, NULL, NULL, &tv);
+		if (ready > 0)
+		{
+			if (fd_fpga_switch >= 0 && FD_ISSET(fd_fpga_switch, &set))
 			{
-				if (sw_state[0] && !prev_fpga[0])
+				unsigned char sw_state[13];
+				if (read(fd_fpga_switch, sw_state, 13) > 0)
+				{
+					if (sw_state[0] && !prev_fpga[0])
+					{
+						enableRawMode();
+						return true;
+					}
+					if (sw_state[2] && !prev_fpga[2])
+					{
+						PlayGameOverSound();
+						return false;
+					}
+					memcpy(prev_fpga, sw_state, 13);
+				}
+			}
+
+			if (fd_sw >= 0 && FD_ISSET(fd_sw, &set))
+			{
+				unsigned char sw_state = 0;
+				if (read(fd_sw, &sw_state, 1) > 0)
+				{
+					bool current_interrupt_state = (sw_state != 0);
+					if (current_interrupt_state && !prev_interrupt_state)
+					{
+						enableRawMode();
+						return true;
+					}
+					prev_interrupt_state = current_interrupt_state;
+				}
+			}
+
+			if (FD_ISSET(STDIN_FILENO, &set))
+			{
+				int c = getchar();
+				if (c == 'r' || c == 'R')
 				{
 					enableRawMode();
 					return true;
 				}
-				if (sw_state[2] && !prev_fpga[2])
-				{
-					return false;
-				}
-				memcpy(prev_fpga, sw_state, 13);
-			}
-		}
-
-		// Check keyboard input
-		fd_set set;
-		struct timeval tv;
-		FD_ZERO(&set);
-		FD_SET(STDIN_FILENO, &set);
-		tv.tv_sec = 0;
-		tv.tv_usec = 100000; // 100ms
-		if (select(STDIN_FILENO + 1, &set, NULL, NULL, &tv) > 0)
-		{
-			int c = getchar();
-			if (c == 'r' || c == 'R')
-			{
-				enableRawMode();
-				return true;
 			}
 		}
 
@@ -774,12 +836,24 @@ int main()
 		cout << "Interrupt switch device not found." << endl;
 	}
 
+	// Try to open buzzer device (optional)
+	fd_buzzer = open("/dev/fpga_buzzer", O_RDWR);
+	if (fd_buzzer >= 0)
+	{
+		cout << "FPGA buzzer device opened successfully!" << endl;
+	}
+	else
+	{
+		cout << "FPGA buzzer device not found (sound disabled)." << endl;
+	}
+
 	GameInit();
 
 	// Select difficulty and mode before starting
 	unsigned int frameMs = SelectDifficulty();
 	wrapWalls = SelectMode();
 	enableRawMode();
+	PlayStartSound();
 
 	while (true)
 	{
@@ -839,6 +913,7 @@ int main()
 		frameMs = SelectDifficulty();
 		wrapWalls = SelectMode();
 		enableRawMode();
+		PlayStartSound();
 	}
 
 	// Close devices if opened
@@ -848,6 +923,8 @@ int main()
 		close(fd_fpga_fnd);
 	if (fd_sw >= 0)
 		close(fd_sw);
+	if (fd_buzzer >= 0)
+		close(fd_buzzer);
 
 	return 0;
 }
