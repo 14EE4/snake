@@ -120,6 +120,17 @@ int main(void) {
 - `play_tone`은 사용자공간에서 사각파를 생성하기 위해 `write(1)/write(0)`를 빠르게 반복합니다. 높은 주파수에서 타이밍 정확도는 제한될 수 있습니다.
 - 실제 프로젝트에서 재사용 시에는 `play_tone` 구현을 모듈화하거나, 정밀 제어가 필요하면 드라이버/FPGA 쪽 PWM 생성을 고려하세요.
 
+## Snake 효과음
+
+현재 `snake.cpp`에서는 다음 상황에서 버저 효과음을 재생합니다.
+
+- 일반 먹이 `#`를 먹었을 때: 높은 짧은 2음 효과음
+- 느린 먹이 `*`를 먹었을 때: 조금 낮은 단음 효과음
+- 벽에 부딪혀 게임 오버가 되었을 때: 낮은 경고음
+- 자기 꼬리에 충돌해 게임 오버가 되었을 때: 낮은 경고음
+
+버저 장치가 없으면 게임은 계속 동작하고, 소리만 비활성화됩니다.
+
 
 ## FPGA Setup (라즈베리파이)
 
@@ -164,7 +175,7 @@ ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 ```bash
 cd ~/workspace/snake
-arm-linux-gnueabi-g++ snake.cpp -o snake -pthread
+arm-linux-gnueabi-g++ snake.cpp buzzer.c -o snake -pthread -lm
 ```
 
 ## Deploy & Run (라즈베리파이)
