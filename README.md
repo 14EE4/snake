@@ -37,7 +37,7 @@ sudo mknod /dev/fpga_buzzer c 264 0
 sudo chmod 666 /dev/fpga_buzzer
 
 # 빌드 (로컬이나 라즈베리파이에서)
-gcc buzzer_test.c -o buzzer_test -lm
+gcc buzzer_test.c -o buzzer_test
 ```
 
 기본 사용법
@@ -55,7 +55,7 @@ gcc buzzer_test.c -o buzzer_test -lm
 예시
 
 ```bash
-./buzzer_test tone 440 500    # 440Hz를 500ms 재생 (A4)
+./buzzer_test tone 440 500    # A4(440Hz)를 500ms 재생
 ./buzzer_test note C4 300     # C4(약 261Hz)를 300ms 재생
 ./buzzer_test blink 5 200     # 5회 200ms 간격으로 on/off
 ./buzzer_test test            # 도레미파솔라시도 재생
@@ -74,13 +74,13 @@ gcc buzzer_test.c -o buzzer_test -lm
 
 ```bash
 # 네이티브(라즈베리파이 또는 리눅스 호스트) 빌드
-gcc buzzer_test.c -o buzzer_test -lm
+gcc buzzer_test.c -o buzzer_test
 
 # 크로스 컴파일(예: x86에서 ARM 타겟 빌드)
-arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -lm -pthread
+arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -pthread
 ```
 
-참고: `note` 기능에서 `pow()`를 사용하므로 링크 시 수학 라이브러리 `libm`을 포함해야 합니다(`-lm`). 크로스 툴체인에서 `libm`이 누락되면 관련 libc 개발 패키지(예: `libc6-dev-armhf-cross` 등)를 설치해야 합니다.
+참고: 현재 `note_name_to_frequency`는 테이블 기반이라 `pow()`에 의존하지 않습니다. 그래서 `-lm`은 더 이상 필요하지 않습니다.
 
 `play_tone` 함수 사용법
 
@@ -124,16 +124,23 @@ int main(void) {
 
 현재 `snake.cpp`에서는 다음 상황에서 버저 효과음을 재생합니다.
 
-- 게임 시작 시: 짧은 상승 멜로디
-- 일반 먹이 `#`를 먹었을 때: 높은 짧은 2음 효과음
-- 느린 먹이 `*`를 먹었을 때: 조금 낮은 단음 효과음
-- 벽에 부딪혀 게임 오버가 되었을 때: 낮은 경고음
-- 자기 꼬리에 충돌해 게임 오버가 되었을 때: 낮은 경고음
-- 게임 종료 후 이름 입력 전에: 짧은 종료 멜로디
+- 게임 시작 시: G5 → B5 계열의 짧은 상승 멜로디
+- 일반 먹이 `#`를 먹었을 때: A5 → C#6 근처의 짧은 2음 효과음
+- 느린 먹이 `*`를 먹었을 때: E5 계열의 짧은 단음 효과음
+- 벽에 부딪혀 게임 오버가 되었을 때: A2 계열의 낮은 경고음
+- 자기 꼬리에 충돌해 게임 오버가 되었을 때: A2 계열의 낮은 경고음
+- 게임 종료 후 이름 입력 전에: G4 → D4 → G3 계열의 짧은 종료 멜로디
 
 버저 장치가 없으면 게임은 계속 동작하고, 소리만 비활성화됩니다.
 
 일시 정지는 interrupt switch로 토글되고, 다시 같은 스위치를 뒤집으면 resume됩니다.
+
+## Troubleshooting
+
+- WSL에서 `make`로 ARM 크로스컴파일한 뒤 Pi에서 `./note_name_test`를 실행했는데 `parse error`가 나면, 먼저 Pi에서 실행한 바이너리가 최신 빌드인지 확인합니다.
+- 이 프로젝트의 `note_name_to_frequency`는 현재 테이블 기반 구현이라 WSL/Pi에서 같은 결과가 나와야 합니다. 실제로는 오래된 바이너리를 실행했거나, 소스 복사 후 재빌드를 안 한 경우가 대부분입니다.
+- 확인 순서: `make clean && make note_name_test`로 다시 빌드한 뒤 Pi로 복사하고, `./note_name_test`를 다시 실행합니다.
+- 테스트용 `note_name_test`는 `/dev/fpga_buzzer`가 없어도 동작합니다. 소리 재생 확인이 필요할 때만 `buzzer_test note ...` 또는 `buzzer_test test`를 사용합니다.
 
 
 ## FPGA Setup (라즈베리파이)
@@ -179,8 +186,10 @@ ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 ```bash
 cd ~/workspace/snake
-arm-linux-gnueabi-g++ snake.cpp buzzer.c -o snake -pthread -lm
+make snake
 ```
+
+`Makefile`은 `arm-linux-gnueabi-g++`와 `arm-linux-gnueabi-gcc`를 사용해서 `snake`, `buzzer_test`, `note_name_test`를 모두 빌드합니다.
 
 ## Deploy & Run (라즈베리파이)
 

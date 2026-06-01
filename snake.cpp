@@ -93,23 +93,27 @@ void UpdateFNDScore(int score)
 	write(fd_fpga_fnd, fnd_value, 4);
 }
 
-static void PlayBuzzerTone(unsigned int freq, long duration_ms)
+static void PlayBuzzerNote(const char *note_name, long duration_ms)
 {
-	if (fd_buzzer >= 0)
-		play_tone(fd_buzzer, freq, duration_ms);
+	if (fd_buzzer < 0)
+		return;
+
+	int freq = 0;
+	if (note_name_to_frequency(note_name, &freq) == 0)
+		play_tone(fd_buzzer, (unsigned int)freq, duration_ms);
 }
 
 static void PlayStartSound()
 {
-	PlayBuzzerTone(784, 90);
-	PlayBuzzerTone(988, 90);
+	PlayBuzzerNote("G5", 90);
+	PlayBuzzerNote("B5", 90);
 }
 
 static void PlayGameOverSound()
 {
-	PlayBuzzerTone(392, 120);
-	PlayBuzzerTone(294, 120);
-	PlayBuzzerTone(196, 180);
+	PlayBuzzerNote("G4", 120);
+	PlayBuzzerNote("D4", 120);
+	PlayBuzzerNote("G3", 180);
 }
 
 // Function to initialize game variables
@@ -470,7 +474,7 @@ void UpdateGame()
 				x = width - 1;
 			else
 			{
-				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -484,7 +488,7 @@ void UpdateGame()
 				x = 0;
 			else
 			{
-				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -498,7 +502,7 @@ void UpdateGame()
 				y = height - 1;
 			else
 			{
-				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -512,7 +516,7 @@ void UpdateGame()
 				y = 0;
 			else
 			{
-				if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 300);
+				PlayBuzzerNote("A2", 300);
 				isGameOver = true;
 				return;
 			}
@@ -538,7 +542,7 @@ void UpdateGame()
 	{
 		if (snakeTailX[i] == x && snakeTailY[i] == y)
 		{
-			if (fd_buzzer >= 0) play_tone(fd_buzzer, 110, 400);
+			PlayBuzzerNote("A2", 400);
 			isGameOver = true;
 		}
 	}
@@ -561,8 +565,8 @@ void UpdateGame()
 		// Play eat sound
 		if (fd_buzzer >= 0)
 		{
-			play_tone(fd_buzzer, 880, 100);
-			play_tone(fd_buzzer, 1100, 80);
+			PlayBuzzerNote("A5", 100);
+			PlayBuzzerNote("C#6", 80);
 		}
 	}
 
@@ -575,8 +579,7 @@ void UpdateGame()
 		slowFruitActive = false;
 		slowEffectTicks = SLOW_DURATION;
 		// Play slow-fruit sound (lower tone)
-		if (fd_buzzer >= 0)
-			play_tone(fd_buzzer, 660, 140);
+		PlayBuzzerNote("E5", 140);
 	}
 
 	// Decrement slow effect
