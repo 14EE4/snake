@@ -70,6 +70,18 @@ gcc buzzer_test.c -o buzzer_test -lm
 
 빠른 확인: 장치를 올바르게 로드하면 `ls -l /dev/fpga_buzzer` 로 존재를 확인하고, `dmesg`에 관련 로그가 남을 수 있습니다.
 
+컴파일 옵션
+
+```bash
+# 네이티브(라즈베리파이 또는 리눅스 호스트) 빌드
+gcc buzzer_test.c -o buzzer_test -lm
+
+# 크로스 컴파일(예: x86에서 ARM 타겟 빌드)
+arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -lm -pthread
+```
+
+참고: `note` 기능에서 `pow()`를 사용하므로 링크 시 수학 라이브러리 `libm`을 포함해야 합니다(`-lm`). 크로스 툴체인에서 `libm`이 누락되면 관련 libc 개발 패키지(예: `libc6-dev-armhf-cross` 등)를 설치해야 합니다.
+
 
 ## FPGA Setup (라즈베리파이)
 
