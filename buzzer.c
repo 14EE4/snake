@@ -65,9 +65,9 @@ int play_tone_seconds(int fd, unsigned int freq, double duration_s)
     while (elapsed_us < target_us)
     {
         if (write_value(fd, 1) != 0) break;
-        usleep(half_period_us);
+        if (usleep(half_period_us) != 0 && errno == EINTR) break;
         if (write_value(fd, 0) != 0) break;
-        usleep(half_period_us);
+        if (usleep(half_period_us) != 0 && errno == EINTR) break;
 
         clock_gettime(CLOCK_MONOTONIC, &now);
         elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_nsec - start.tv_nsec) / 1000L;

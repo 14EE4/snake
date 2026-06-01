@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ctype.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +11,25 @@
 #define BUZZER_ON_DURATION_US 200000
 #define DEFAULT_SEQ_FILE "out.seq"
 #define DEFAULT_SEQ_GAP_MS 20
+
+static volatile sig_atomic_t g_stop_requested = 0;
+static int g_buzzer_fd = -1;
+
+static void cleanup_buzzer(void)
+{
+	if (g_buzzer_fd >= 0)
+	{
+		write_value(g_buzzer_fd, 0);
+		close(g_buzzer_fd);
+		g_buzzer_fd = -1;
+	}
+}
+
+static void handle_sigint(int signum)
+{
+	(void)signum;
+	g_stop_requested = 1;
+}
 
 static void usage(const char *prog)
 {
@@ -40,6 +60,9 @@ static int play_sequence_file(int fd, const char *path)
 	int line_no = 0;
 	while (fgets(line, sizeof(line), fp))
 	{
+		if (g_stop_requested)
+			break;
+
 		line_no++;
 		char *p = line;
 		while (*p && isspace((unsigned char)*p)) p++;
@@ -77,12 +100,17 @@ static int play_sequence_file(int fd, const char *path)
 		}
 
 		if (rest_ms > 0.0)
-			usleep((useconds_t)(rest_ms * 1000.0 + 0.5));
+		{
+			if (usleep((useconds_t)(rest_ms * 1000.0 + 0.5)) != 0 && errno == EINTR)
+				break;
+		}
 
 		if (duration_ms <= 0.0)
 			duration_ms = 100.0;
 
 		play_tone_seconds(fd, (unsigned int)freq, duration_ms / 1000.0);
+		if (g_stop_requested)
+			break;
 	}
 
 	fclose(fp);
@@ -94,6 +122,7 @@ int main(int argc, char *argv[])
 	int fd;
 	unsigned char value = 0;
 	const char *mode = "pulse";
+	struct sigaction sa;
 
 	if (argc > 1)
 	{
@@ -105,6 +134,12 @@ int main(int argc, char *argv[])
 		mode = argv[1];
 	}
 
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = handle_sigint;
+	sigemptyset(&sa.sa_mask);
+	sigaction(SIGINT, &sa, NULL);
+	g_stop_requested = 0;
+
 	fd = open(BUZZER_DEVICE, O_RDWR);
 	if (fd < 0)
 	{
@@ -112,6 +147,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Failed to open %s\n", BUZZER_DEVICE);
 		return 1;
 	}
+
+	g_buzzer_fd = fd;
 
 	if (strcmp(mode, "on") == 0)
 	{
@@ -215,6 +252,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	close(fd);
+	cleanup_buzzer();
+	g_buzzer_fd = -1;
 	return 0;
 }
