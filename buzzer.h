@@ -15,4 +15,7 @@ int play_tone(int fd, unsigned int freq, long duration_ms);
 // Convert note name (e.g. "A4", "C#3") to frequency in Hz
 int note_name_to_frequency(const char *name, int *out_freq);
 
+// Convert a MIDI note number (12=C0, 69=A4) to frequency in Hz
+int midi_note_to_frequency(int midi_note, int *out_freq);
+
 #endif // BUZZER_H

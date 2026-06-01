@@ -5,7 +5,7 @@ CFLAGS := -Wall -Wextra -O2
 
 .PHONY: all clean
 
-all: snake buzzer_test note_name_test
+all: snake buzzer_test note_name_test midi_note_test
 
 snake: snake.cpp buzzer.c buzzer.h
 	$(CXX) snake.cpp buzzer.c -o $@ -pthread
@@ -16,5 +16,8 @@ buzzer_test: buzzer_test.c buzzer.c buzzer.h
 note_name_test: note_name_test.c buzzer.c buzzer.h
 	$(CC) $(CFLAGS) note_name_test.c buzzer.c -o $@
 
+midi_note_test: midi_note_test.c buzzer.c buzzer.h
+	$(CC) $(CFLAGS) midi_note_test.c buzzer.c -o $@
+
 clean:
-	rm -f snake buzzer_test note_name_test *.o
+	rm -f snake buzzer_test note_name_test midi_note_test *.o
