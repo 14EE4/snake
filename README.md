@@ -22,6 +22,119 @@ FPGA 버튼과 FND 디스플레이를 연동하는 snake 게임입니다.
 - `fpga_push_switch`: major `265`
 - `fpga_fnd`: major `261`
 - `my_led_dev`: major `236` (interrupt switch)
+- `fpga_buzzer`: major `264`
+
+## Buzzer Test Example
+
+버저 드라이버는 1바이트 write/read 방식입니다. 포함된 테스트 유틸리티 `buzzer_test` 로 여러 동작을 확인할 수 있습니다.
+
+빌드 및 준비
+
+```bash
+# (라즈베리파이에서) 모듈을 삽입한 뒤 장치 노드 생성
+sudo insmod fpga_buzzer_driver.ko
+sudo mknod /dev/fpga_buzzer c 264 0
+sudo chmod 666 /dev/fpga_buzzer
+
+# 빌드 (로컬이나 라즈베리파이에서)
+gcc buzzer_test.c -o buzzer_test -lm
+```
+
+기본 사용법
+
+```bash
+./buzzer_test on               # 짧게 켰다가 끕니다 (기본 200ms)
+./buzzer_test off              # 끕니다
+./buzzer_test pulse            # 짧은 펄스 (기본 약 150ms)
+./buzzer_test blink <n> <ms>   # n회 깜빡임, 각 on/off 지연(ms)
+./buzzer_test tone <hz> <ms>   # 지정 주파수(hz)를 duration(ms)만큼 재생
+./buzzer_test note <name> <ms> # 음계 이름(C4, A3, G#5 등)을 duration(ms)만큼 재생
+./buzzer_test test             # C major 스케일(C4..C5)을 연주
+```
+
+예시
+
+```bash
+./buzzer_test tone 440 500    # 440Hz를 500ms 재생 (A4)
+./buzzer_test note C4 300     # C4(약 261Hz)를 300ms 재생
+./buzzer_test blink 5 200     # 5회 200ms 간격으로 on/off
+./buzzer_test test            # 도레미파솔라시도 재생
+```
+
+설명 및 제약
+
+- `tone` 모드는 직접 주파수를 받습니다. 유저스페이스 타이머 정밀도의 한계로 매우 높은 주파수나 정밀 주파수 제어에는 한계가 있습니다.
+- `note` 모드는 `A4 = 440Hz` 기준으로 음계 이름을 계산합니다. 지원 예: `C4`, `G#4` (또는 `Ab4`), `A3` 등. 옥타브 숫자를 반드시 포함해야 합니다.
+- 주파수 범위: 내부에서 20Hz ~ 20000Hz 로 제한합니다.
+- 볼륨(실제 음량) 제어는 하드웨어(버저 회로)나 FPGA 쪽 PWM/증폭기 설계가 필요합니다. 유저스페이스에서는 듀티비 조작으로 감지상 음량을 낮출 수 있으나 효과는 하드웨어에 따라 다릅니다.
+
+빠른 확인: 장치를 올바르게 로드하면 `ls -l /dev/fpga_buzzer` 로 존재를 확인하고, `dmesg`에 관련 로그가 남을 수 있습니다.
+
+컴파일 옵션
+
+```bash
+# 네이티브(라즈베리파이 또는 리눅스 호스트) 빌드
+gcc buzzer_test.c -o buzzer_test -lm
+
+# 크로스 컴파일(예: x86에서 ARM 타겟 빌드)
+arm-linux-gnueabi-gcc buzzer_test.c -o buzzer_test -lm -pthread
+```
+
+참고: `note` 기능에서 `pow()`를 사용하므로 링크 시 수학 라이브러리 `libm`을 포함해야 합니다(`-lm`). 크로스 툴체인에서 `libm`이 누락되면 관련 libc 개발 패키지(예: `libc6-dev-armhf-cross` 등)를 설치해야 합니다.
+
+`play_tone` 함수 사용법
+
+`buzzer_test.c`에는 내부적으로 재사용 가능한 `play_tone` 헬퍼가 있습니다. 다른 C 프로그램에서 동일한 패턴으로 음을 재생하려면 이 함수를 복사해서 사용하거나 `buzzer_test.c`의 구현을 참조하세요.
+
+함수 시그니처:
+
+```c
+// fd: 열린 /dev/fpga_buzzer 파일 디스크립터
+// freq: 재생할 주파수(Hz)
+// duration_ms: 재생 시간(밀리초)
+static int play_tone(int fd, unsigned int freq, long duration_ms);
+```
+
+간단한 사용 예제:
+
+```c
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+
+extern int play_tone(int fd, unsigned int freq, long duration_ms); // 또는 buzzer_test.c 내부 복사
+
+int main(void) {
+	int fd = open("/dev/fpga_buzzer", O_RDWR);
+	if (fd < 0) { perror("open"); return 1; }
+
+	// A4(440Hz)를 500ms 재생
+	play_tone(fd, 440, 500);
+
+	close(fd);
+	return 0;
+}
+```
+
+주의:
+- `play_tone`은 사용자공간에서 사각파를 생성하기 위해 `write(1)/write(0)`를 빠르게 반복합니다. 높은 주파수에서 타이밍 정확도는 제한될 수 있습니다.
+- 실제 프로젝트에서 재사용 시에는 `play_tone` 구현을 모듈화하거나, 정밀 제어가 필요하면 드라이버/FPGA 쪽 PWM 생성을 고려하세요.
+
+## Snake 효과음
+
+현재 `snake.cpp`에서는 다음 상황에서 버저 효과음을 재생합니다.
+
+- 게임 시작 시: 짧은 상승 멜로디
+- 일반 먹이 `#`를 먹었을 때: 높은 짧은 2음 효과음
+- 느린 먹이 `*`를 먹었을 때: 조금 낮은 단음 효과음
+- 벽에 부딪혀 게임 오버가 되었을 때: 낮은 경고음
+- 자기 꼬리에 충돌해 게임 오버가 되었을 때: 낮은 경고음
+- 게임 종료 후 이름 입력 전에: 짧은 종료 멜로디
+
+버저 장치가 없으면 게임은 계속 동작하고, 소리만 비활성화됩니다.
+
+일시 정지는 interrupt switch로 토글되고, 다시 같은 스위치를 뒤집으면 resume됩니다.
+
 
 ## FPGA Setup (라즈베리파이)
 
@@ -34,6 +147,7 @@ sudo insmod fpga_interface_driver.ko
 # 2) FPGA 디바이스 드라이버 로드
 sudo insmod fpga_push_switch_driver.ko
 sudo insmod fpga_fnd_driver.ko
+sudo insmod fpga_buzzer_driver.ko
 
 # 3) 인터럽트 스위치 드라이버 로드
 sudo insmod itr_driver.ko
@@ -41,21 +155,23 @@ sudo insmod itr_driver.ko
 # 4) FPGA 디바이스 노드 생성
 sudo mknod /dev/fpga_push_switch c 265 0
 sudo mknod /dev/fpga_fnd c 261 0
+sudo mknod /dev/fpga_buzzer c 264 0
 sudo mknod /dev/my_led_dev c 236 0
 
 # 5) 권한 부여
-sudo chmod 666 /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
+sudo chmod 666 /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 # 6) 모듈 로드 확인
 lsmod | grep -E "fpga|itr"
 dmesg | tail -20
 
 # 7) 디바이스 노드 확인
-ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
+ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 
 # 정상이면 이렇게 나옵니다:
 # crw-r--r-- 1 root root 265, 0 ... /dev/fpga_push_switch
 # crw-r--r-- 1 root root 261, 0 ... /dev/fpga_fnd
+# crw-r--r-- 1 root root 264, 0 ... /dev/fpga_buzzer
 # crw-r--r-- 1 root root 236, 0 ... /dev/my_led_dev
 ```
 
@@ -63,7 +179,7 @@ ls -l /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
 
 ```bash
 cd ~/workspace/snake
-arm-linux-gnueabi-g++ snake.cpp -o snake -pthread
+arm-linux-gnueabi-g++ snake.cpp buzzer.c -o snake -pthread -lm
 ```
 
 ## Deploy & Run (라즈베리파이)
@@ -135,10 +251,11 @@ Restart? FPGA Switch 0 = restart, 2 = exit
 
 ```bash
 sudo rmmod itr_driver
+sudo rmmod fpga_buzzer_driver
 sudo rmmod fpga_fnd_driver
 sudo rmmod fpga_push_switch_driver
 sudo rmmod fpga_interface_driver
-sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/my_led_dev
+sudo rm -f /dev/fpga_push_switch /dev/fpga_fnd /dev/fpga_buzzer /dev/my_led_dev
 ```
 
 ## Control Methods (우선순위 순)
