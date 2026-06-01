@@ -36,6 +36,11 @@ int x, y;
 bool wrapWalls = false;
 // Food coordinates
 int fruitCordX, fruitCordY;
+// Slow fruit (*) coordinates and state
+bool slowFruitActive = false;
+int slowFruitX, slowFruitY;
+int slowEffectTicks = 0;
+const int SLOW_DURATION = 20;
 // variable to store the score of the player
 int playerScore;
 // variable to store the highest score
@@ -96,6 +101,8 @@ void GameInit()
 	fruitCordY = rand() % height;
 	playerScore = 0;
 	snakeTailLen = 0;
+	slowFruitActive = false;
+	slowEffectTicks = 0;
 	memset(snakeTailX, 0, sizeof(snakeTailX));
 	memset(snakeTailY, 0, sizeof(snakeTailY));
 	UpdateFNDScore(playerScore);
@@ -138,9 +145,24 @@ unsigned int SelectDifficulty()
 			unsigned char sw_state[13];
 			if (read(fd_fpga_switch, sw_state, 13) > 0)
 			{
-				if (sw_state[0]) { cout << ">> Easy 선택!" << endl;   sleep(1); return 200; }
-				if (sw_state[1]) { cout << ">> Normal 선택!" << endl; sleep(1); return 150; }
-				if (sw_state[2]) { cout << ">> Hard 선택!" << endl;   sleep(1); return 100; }
+				if (sw_state[0])
+				{
+					cout << ">> Easy 선택!" << endl;
+					sleep(1);
+					return 200;
+				}
+				if (sw_state[1])
+				{
+					cout << ">> Normal 선택!" << endl;
+					sleep(1);
+					return 150;
+				}
+				if (sw_state[2])
+				{
+					cout << ">> Hard 선택!" << endl;
+					sleep(1);
+					return 100;
+				}
 			}
 		}
 	}
@@ -155,9 +177,21 @@ unsigned int SelectDifficulty()
 		while (true)
 		{
 			cin >> choice;
-			if (choice == '0') { cout << ">> Easy 선택!" << endl;   return 200; }
-			if (choice == '1') { cout << ">> Normal 선택!" << endl; return 150; }
-			if (choice == '2') { cout << ">> Hard 선택!" << endl;   return 100; }
+			if (choice == '0')
+			{
+				cout << ">> Easy 선택!" << endl;
+				return 200;
+			}
+			if (choice == '1')
+			{
+				cout << ">> Normal 선택!" << endl;
+				return 150;
+			}
+			if (choice == '2')
+			{
+				cout << ">> Hard 선택!" << endl;
+				return 100;
+			}
 			cout << "0, 1, 2 중에 선택해주세요: " << flush;
 		}
 	}
@@ -199,8 +233,18 @@ bool SelectMode()
 			unsigned char sw_state[13];
 			if (read(fd_fpga_switch, sw_state, 13) > 0)
 			{
-				if (sw_state[0]) { cout << ">> Normal 모드 선택!" << endl; sleep(1); return false; }
-				if (sw_state[1]) { cout << ">> Wrap 모드 선택!" << endl;   sleep(1); return true; }
+				if (sw_state[0])
+				{
+					cout << ">> Normal 모드 선택!" << endl;
+					sleep(1);
+					return false;
+				}
+				if (sw_state[1])
+				{
+					cout << ">> Wrap 모드 선택!" << endl;
+					sleep(1);
+					return true;
+				}
 			}
 		}
 	}
@@ -214,8 +258,16 @@ bool SelectMode()
 		while (true)
 		{
 			cin >> choice;
-			if (choice == '0') { cout << ">> Normal 모드 선택!" << endl;   return false; }
-			if (choice == '1') { cout << ">> Wrap 모드 선택!" << endl;     return true; }
+			if (choice == '0')
+			{
+				cout << ">> Normal 모드 선택!" << endl;
+				return false;
+			}
+			if (choice == '1')
+			{
+				cout << ">> Wrap 모드 선택!" << endl;
+				return true;
+			}
 			cout << "0 또는 1 중에 선택해주세요: " << flush;
 		}
 	}
@@ -318,6 +370,9 @@ void GameRender(string playerName, unsigned int frameMs)
 			// Creating the snake's food with '#'
 			else if (i == fruitCordY && j == fruitCordX)
 				cout << "#";
+			// Creating the slow fruit with '*'
+			else if (slowFruitActive && i == slowFruitY && j == slowFruitX)
+				cout << "*";
 			else
 			{
 				bool prTail = false;
@@ -350,6 +405,10 @@ void GameRender(string playerName, unsigned int frameMs)
 	// Display difficulty
 	string diffLabel = (frameMs == 200) ? "Easy" : (frameMs == 150) ? "Normal" : "Hard";
 	cout << "Difficulty: " << diffLabel << endl;
+
+	if (slowEffectTicks > 0)
+		cout << "** SLOW! (" << slowEffectTicks << " ticks 남음) **" << endl;
+	cout << "Fruit: # = +10pts  |  * = +5pts + 속도 감소" << endl;
 
 	// Display mode
 	string modeLabel = wrapWalls ? "Wrap (벽 닿으면 반대편으로)" : "Normal (벽 닿으면 죽음)";
@@ -454,11 +513,32 @@ void UpdateGame()
 	if (x == fruitCordX && y == fruitCordY)
 	{
 		playerScore += 10;
-		fruitCordX = rand() % width;
-		fruitCordY = rand() % height;
 		snakeTailLen++;
 		UpdateFNDScore(playerScore);
+		fruitCordX = rand() % width;
+		fruitCordY = rand() % height;
+		// 30% 확률로 slow fruit 생성
+		if (!slowFruitActive && (rand() % 10) < 3)
+		{
+			slowFruitActive = true;
+			slowFruitX = rand() % width;
+			slowFruitY = rand() % height;
+		}
 	}
+
+	// Checks for snake's collision with slow fruit (*)
+	if (slowFruitActive && x == slowFruitX && y == slowFruitY)
+	{
+		playerScore += 5;
+		snakeTailLen++;
+		UpdateFNDScore(playerScore);
+		slowFruitActive = false;
+		slowEffectTicks = SLOW_DURATION;
+	}
+
+	// Decrement slow effect
+	if (slowEffectTicks > 0)
+		slowEffectTicks--;
 }
 
 // Function to handle keyboard input
@@ -705,6 +785,7 @@ int main()
 	{
 		while (!isGameOver)
 		{
+			unsigned int currentFrameMs = (slowEffectTicks > 0) ? frameMs * 2 : frameMs;
 			GameRender("Player", frameMs);
 
 			// Interrupt switch is always checked first so it can pause/resume the game
@@ -745,16 +826,13 @@ int main()
 			{
 				UpdateGame();
 			}
-			std::this_thread::sleep_for(std::chrono::milliseconds(frameMs));
+			std::this_thread::sleep_for(std::chrono::milliseconds(currentFrameMs));
 		}
 
 		if (!PromptRestart())
 		{
 			break;
 		}
-
-		GameInit();
-
 		GameInit();
 
 		// Re-select difficulty and mode on restart
