@@ -1,4 +1,4 @@
-// required header file
+// 헤더 파일
 #include <iostream>
 #include <string>
 #include <cstdlib>
@@ -17,44 +17,44 @@ using namespace std;
 
 #include "buzzer.h"
 
-// height and width of the boundary
+// 게임 보드 가로/세로 크기
 const int width = 80;
 const int height = 20;
 
-// FPGA push switch device
+// FPGA 푸시 스위치 디바이스
 int fd_fpga_switch = -1;
 bool use_fpga_switch = false;
 
-// FPGA FND device
+// FPGA FND 디바이스
 int fd_fpga_fnd = -1;
 
-// Interrupt switch device
+// 인터럽트 스위치 디바이스
 int fd_sw = -1;
 bool use_interrupt_switch = false;
-// Buzzer device
+// 버저 디바이스
 int fd_buzzer = -1;
 
-// Snake head coordinates of snake (x-axis, y-axis)
+// 뱀 머리 좌표 (x축, y축)
 int x, y;
-// Whether hitting wall wraps to opposite side (true) or causes death (false)
+// 벽 통과 모드 여부 (true: 반대편 출현, false: 게임 오버)
 bool wrapWalls = false;
-// Food coordinates
+// 일반 과일 좌표
 int fruitCordX, fruitCordY;
-// Slow fruit (*) coordinates and state
+// 느린 과일(*) 좌표 및 상태
 bool slowFruitActive = false;
 int slowFruitX, slowFruitY;
 int slowEffectTicks = 0;
 const int SLOW_DURATION = 20;
-// variable to store the score of the player
+// 플레이어 점수
 int playerScore;
-// variable to store the highest score
+// 최고 점수
 int highScore = 0;
 string highScoreName = "";
-// Array to store the coordinates of snake tail (x-axis, y-axis)
+// 뱀 꼬리 좌표 배열 (x축, y축)
 int snakeTailX[100], snakeTailY[100];
-// variable to store the length of the snake's tail
+// 뱀 꼬리 길이
 int snakeTailLen;
-// for storing snake's moving snakesDirection
+// 뱀 이동 방향
 enum snakesDirection
 {
 	STOP = 0,
@@ -63,9 +63,9 @@ enum snakesDirection
 	UP,
 	DOWN
 };
-// snakesDirection variable
+// 현재 이동 방향 변수
 snakesDirection sDir;
-// boolean variable for checking game is over or not
+// 게임 오버 여부
 bool isGameOver;
 
 bool gamePaused = false;
@@ -116,7 +116,7 @@ static void PlayGameOverSound()
 	PlayBuzzerNote("G3", 180);
 }
 
-// Function to initialize game variables
+// 게임 변수 초기화 함수
 void GameInit()
 {
 	isGameOver = false;
@@ -135,7 +135,7 @@ void GameInit()
 	UpdateFNDScore(playerScore);
 }
 
-// Function to select difficulty
+// 난이도 선택 함수
 unsigned int SelectDifficulty()
 {
 	cout << endl;
@@ -147,7 +147,7 @@ unsigned int SelectDifficulty()
 		cout << "Button 1 = Normal (150ms - 보통)" << endl;
 		cout << "Button 2 = Hard   (100ms - 빠르게)" << endl;
 
-		// Wait for all buttons to be released before reading input
+		// 모든 버튼이 떼어질 때까지 대기
 		unsigned char sw_state[13];
 		bool anyPressed = true;
 		while (anyPressed)
@@ -224,7 +224,7 @@ unsigned int SelectDifficulty()
 	}
 }
 
-// Function to select wall behavior mode
+// 벽 동작 모드 선택 함수
 bool SelectMode()
 {
 	cout << endl;
@@ -235,7 +235,7 @@ bool SelectMode()
 		cout << "Button 0 = Normal (벽 닿으면 죽음)" << endl;
 		cout << "Button 1 = Wrap   (벽 닿으면 반대편으로 넘어감)" << endl;
 
-		// Wait for release
+		// 버튼 릴리즈 대기
 		unsigned char sw_state[13];
 		bool anyPressed = true;
 		while (anyPressed)
@@ -313,7 +313,7 @@ bool PromptRestart()
 
 	cout << "Game Over! Final Score: " << playerScore << endl;
 
-	// Check and update high score
+	// 최고 점수 갱신 확인
 	if (playerScore > highScore)
 	{
 		highScore = playerScore;
@@ -378,12 +378,12 @@ bool PromptRestart()
 	}
 }
 
-// Function for creating the game board & rendering
+// 게임 보드 렌더링 함수
 void GameRender(string playerName, unsigned int frameMs)
 {
-	std::system("clear"); // Clear the console (POSIX)
+	std::system("clear"); // 화면 지우기
 
-	// Creating top walls with '-'
+	// 상단 벽 '-' 출력
 	for (int i = 0; i < width + 2; i++)
 		cout << "-";
 	cout << endl;
@@ -392,16 +392,16 @@ void GameRender(string playerName, unsigned int frameMs)
 	{
 		for (int j = 0; j <= width; j++)
 		{
-			// Creating side walls with '|'
+			// 좌우 벽 '|' 출력
 			if (j == 0 || j == width)
 				cout << "|";
-			// Creating snake's head with 'O'
+			// 뱀 머리 'O' 출력
 			if (i == y && j == x)
 				cout << "O";
-			// Creating the snake's food with '#'
+			// 일반 과일 '#' 출력
 			else if (i == fruitCordY && j == fruitCordX)
 				cout << "#";
-			// Creating the slow fruit with '*'
+			// 느린 과일 '*' 출력
 			else if (slowFruitActive && i == slowFruitY && j == slowFruitX)
 				cout << "*";
 			else
@@ -422,26 +422,27 @@ void GameRender(string playerName, unsigned int frameMs)
 		cout << endl;
 	}
 
-	// Creating bottom walls with '-'
+	// 하단 벽 '-' 출력
 	for (int i = 0; i < width + 2; i++)
 		cout << "-";
 	cout << endl;
 
-	// Display player's score and difficulty
+	// 점수 및 난이도 표시
 	cout << playerName << "'s Score: " << playerScore;
 	if (highScore > 0)
 		cout << "  |  High Score: " << highScore << " (" << highScoreName << ")";
 	cout << endl;
 
-	// Display difficulty
-	string diffLabel = (frameMs == 200) ? "Easy" : (frameMs == 150) ? "Normal" : "Hard";
+	// 난이도 표시
+	string diffLabel = (frameMs == 200) ? "Easy" : (frameMs == 150) ? "Normal"
+																	: "Hard";
 	cout << "Difficulty: " << diffLabel << endl;
 
 	if (slowEffectTicks > 0)
 		cout << "** SLOW! (" << slowEffectTicks << " ticks 남음) **" << endl;
 	cout << "Fruit: # = +10pts  |  * = +5pts + 속도 감소" << endl;
 
-	// Display mode
+	// 모드 표시
 	string modeLabel = wrapWalls ? "Wrap (벽 닿으면 반대편으로)" : "Normal (벽 닿으면 죽음)";
 	cout << "Mode: " << modeLabel << endl;
 
@@ -455,7 +456,7 @@ void GameRender(string playerName, unsigned int frameMs)
 		cout << "Control: Up: 8 / Down: 2 / Left: 4 / Right: 6 (Keyboard)" << endl;
 }
 
-// Function for updating the game state
+// 게임 상태 업데이트 함수
 void UpdateGame()
 {
 	int headX = x;
@@ -537,7 +538,7 @@ void UpdateGame()
 		prevY = prev2Y;
 	}
 
-	// Checks for collision with the tail (o)
+	// 꼬리 충돌 확인
 	for (int i = 0; i < snakeTailLen; i++)
 	{
 		if (snakeTailX[i] == x && snakeTailY[i] == y)
@@ -547,7 +548,7 @@ void UpdateGame()
 		}
 	}
 
-	// Checks for snake's collision with the food (#)
+	// 일반 과일('#') 충돌 확인
 	if (x == fruitCordX && y == fruitCordY)
 	{
 		playerScore += 10;
@@ -562,7 +563,7 @@ void UpdateGame()
 			slowFruitX = rand() % width;
 			slowFruitY = rand() % height;
 		}
-		// Play eat sound
+		// 과일 획득 효과음 재생
 		if (fd_buzzer >= 0)
 		{
 			PlayBuzzerNote("A5", 100);
@@ -570,7 +571,7 @@ void UpdateGame()
 		}
 	}
 
-	// Checks for snake's collision with slow fruit (*)
+	// 느린 과일('*') 충돌 확인
 	if (slowFruitActive && x == slowFruitX && y == slowFruitY)
 	{
 		playerScore += 5;
@@ -578,16 +579,16 @@ void UpdateGame()
 		UpdateFNDScore(playerScore);
 		slowFruitActive = false;
 		slowEffectTicks = SLOW_DURATION;
-		// Play slow-fruit sound (lower tone)
+		// 느린 과일 효과음 재생 (낮은 음)
 		PlayBuzzerNote("E5", 140);
 	}
 
-	// Decrement slow effect
+	// 속도 감소 효과 틱 감소
 	if (slowEffectTicks > 0)
 		slowEffectTicks--;
 }
 
-// Function to handle keyboard input
+// 키보드 입력 처리 함수
 void UserInput()
 {
 	fd_set set;
@@ -620,7 +621,7 @@ void UserInput()
 	}
 }
 
-// Function to handle FPGA push switch input
+// FPGA 푸시 스위치 입력 처리 함수
 void FPGASwitchInput()
 {
 	if (fd_fpga_switch < 0)
@@ -629,7 +630,7 @@ void FPGASwitchInput()
 	unsigned char sw_state[13];
 	if (read(fd_fpga_switch, sw_state, 13) > 0)
 	{
-		// Button mapping: 1=UP, 3=LEFT, 5=RIGHT, 7=DOWN
+		// 버튼 매핑: 1=위, 3=왼쪽, 5=오른쪽, 7=아래
 		if (sw_state[1])
 			sDir = UP;
 		if (sw_state[3])
@@ -641,7 +642,7 @@ void FPGASwitchInput()
 	}
 }
 
-// Function to handle interrupt switch input
+// 인터럽트 스위치 입력 처리 함수
 void InterruptSwitchInput()
 {
 	if (fd_sw < 0)
@@ -660,8 +661,8 @@ void InterruptSwitchInput()
 	}
 }
 
-// Show a single-shot pause menu when the game is paused via interrupt.
-// Returns true to resume, false to end the game (treat as game over).
+// 인터럽트로 일시정지 시 일회성 메뉴 표시
+// 재개 시 true, 종료 시 false 반환
 bool PauseMenu()
 {
 	disableRawMode();
@@ -798,10 +799,10 @@ void enableRawMode()
 	atexit(disableRawMode);
 }
 
-// Main function / game looping function
+// 메인 함수 / 게임 루프
 int main()
 {
-	// Try to open FPGA push switch device
+	// FPGA 푸시 스위치 디바이스 열기
 	fd_fpga_switch = open("/dev/fpga_push_switch", O_RDWR);
 	if (fd_fpga_switch >= 0)
 	{
@@ -813,7 +814,7 @@ int main()
 		cout << "FPGA push switch device not found. Using keyboard input." << endl;
 	}
 
-	// Try to open FPGA FND device
+	// FPGA FND 디바이스 열기
 	fd_fpga_fnd = open("/dev/fpga_fnd", O_RDWR);
 	if (fd_fpga_fnd >= 0)
 	{
@@ -824,7 +825,7 @@ int main()
 		cout << "FPGA FND device not found. Score will be shown on console only." << endl;
 	}
 
-	// Try to open interrupt switch device
+	// 인터럽트 스위치 디바이스 열기
 	fd_sw = open("/dev/my_led_dev", O_RDWR);
 	if (fd_sw >= 0)
 	{
@@ -836,7 +837,7 @@ int main()
 		cout << "Interrupt switch device not found." << endl;
 	}
 
-	// Try to open buzzer device (optional)
+	// 버저 디바이스 열기 (선택)
 	fd_buzzer = open("/dev/fpga_buzzer", O_RDWR);
 	if (fd_buzzer >= 0)
 	{
@@ -849,7 +850,7 @@ int main()
 
 	GameInit();
 
-	// Select difficulty and mode before starting
+	// 게임 시작 전 난이도 및 모드 선택
 	unsigned int frameMs = SelectDifficulty();
 	wrapWalls = SelectMode();
 	enableRawMode();
@@ -862,12 +863,12 @@ int main()
 			unsigned int currentFrameMs = (slowEffectTicks > 0) ? frameMs * 2 : frameMs;
 			GameRender("Player", frameMs);
 
-			// Interrupt switch is always checked first so it can pause/resume the game
+			// 인터럽트 스위치 우선 확인 (일시정지/재개)
 			if (use_interrupt_switch)
 			{
 				InterruptSwitchInput();
 
-				// If paused by interrupt, show a single-shot pause menu (no repeated prints)
+				// 일시정지 시 일회성 메뉴 표시 (반복 출력 방지)
 				if (gamePaused && !pauseMenuActive)
 				{
 					pauseMenuActive = true;
@@ -886,7 +887,7 @@ int main()
 				}
 			}
 
-			// Handle movement input only when the game is not paused
+			// 일시정지 중이 아닐 때만 이동 입력 처리
 			if (!gamePaused && use_fpga_switch)
 			{
 				FPGASwitchInput();
@@ -909,14 +910,14 @@ int main()
 		}
 		GameInit();
 
-		// Re-select difficulty and mode on restart
+		// 재시작 시 난이도 및 모드 재선택
 		frameMs = SelectDifficulty();
 		wrapWalls = SelectMode();
 		enableRawMode();
 		PlayStartSound();
 	}
 
-	// Close devices if opened
+	// 열린 디바이스 닫기
 	if (fd_fpga_switch >= 0)
 		close(fd_fpga_switch);
 	if (fd_fpga_fnd >= 0)
