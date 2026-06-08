@@ -175,18 +175,21 @@ unsigned int SelectDifficulty()
 				if (sw_state[0])
 				{
 					cout << ">> Easy 선택!" << endl;
+					PlayBuzzerNote("A5", 90);
 					sleep(1);
 					return 200;
 				}
 				if (sw_state[1])
 				{
 					cout << ">> Normal 선택!" << endl;
+					PlayBuzzerNote("C5", 90);
 					sleep(1);
 					return 150;
 				}
 				if (sw_state[2])
 				{
 					cout << ">> Hard 선택!" << endl;
+					PlayBuzzerNote("E5", 90);
 					sleep(1);
 					return 100;
 				}
@@ -207,11 +210,13 @@ unsigned int SelectDifficulty()
 			if (choice == '0')
 			{
 				cout << ">> Easy 선택!" << endl;
+				PlayBuzzerNote("A5", 90);
 				return 200;
 			}
 			if (choice == '1')
 			{
 				cout << ">> Normal 선택!" << endl;
+				PlayBuzzerNote("C5", 90);
 				return 150;
 			}
 			if (choice == '2')
@@ -263,12 +268,14 @@ bool SelectMode()
 				if (sw_state[0])
 				{
 					cout << ">> Normal 모드 선택!" << endl;
+					PlayBuzzerNote("A4", 120);
 					sleep(1);
 					return false;
 				}
 				if (sw_state[1])
 				{
 					cout << ">> Wrap 모드 선택!" << endl;
+					PlayBuzzerNote("C4", 120);
 					sleep(1);
 					return true;
 				}
@@ -345,6 +352,7 @@ bool PromptRestart()
 			{
 				if (sw_state[0])
 				{
+					PlayStartSound();
 					return true;
 				}
 				if (sw_state[2])
@@ -631,14 +639,25 @@ void FPGASwitchInput()
 	if (read(fd_fpga_switch, sw_state, 13) > 0)
 	{
 		// 버튼 매핑: 1=위, 3=왼쪽, 5=오른쪽, 7=아래
-		if (sw_state[1])
+		if (sw_state[1]){
+			PlayBuzzerNote("G4", 120);
 			sDir = UP;
-		if (sw_state[3])
+		}
+
+		if (sw_state[3]){
+			PlayBuzzerNote("C4", 120);
 			sDir = LEFT;
-		if (sw_state[5])
+		}
+
+		if (sw_state[5]){
+			PlayBuzzerNote("E4", 120);
 			sDir = RIGHT;
-		if (sw_state[7])
+		}
+		if (sw_state[7]){
+			PlayBuzzerNote("D4", 120);
 			sDir = DOWN;
+		}
+
 	}
 }
 
@@ -668,6 +687,7 @@ bool PauseMenu()
 	disableRawMode();
 
 	cout << "\n=== Game Paused ===" << endl;
+	PlayGameOverSound();
 	if (use_fpga_switch)
 	{
 		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
@@ -736,11 +756,14 @@ bool PauseMenu()
 				unsigned char sw_state[13];
 				if (read(fd_fpga_switch, sw_state, 13) > 0)
 				{
+					//continue 
 					if (sw_state[0] && !prev_fpga[0])
 					{
+						PlayStartSound();
 						enableRawMode();
 						return true;
 					}
+					//game over if button 2 is pressed
 					if (sw_state[2] && !prev_fpga[2])
 					{
 						PlayGameOverSound();
