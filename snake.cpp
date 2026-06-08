@@ -45,6 +45,10 @@ bool slowFruitActive = false;
 int slowFruitX, slowFruitY;
 int slowEffectTicks = 0;
 const int SLOW_DURATION = 20;
+// 점수 2배 과일($) 좌표 및 상태
+bool doubleFruitActive = false;
+int doubleFruitX, doubleFruitY;
+bool scoreDoubled = false;
 // 플레이어 점수
 int playerScore;
 // 최고 점수
@@ -130,6 +134,8 @@ void GameInit()
 	snakeTailLen = 0;
 	slowFruitActive = false;
 	slowEffectTicks = 0;
+	doubleFruitActive = false;
+	scoreDoubled = false;
 	memset(snakeTailX, 0, sizeof(snakeTailX));
 	memset(snakeTailY, 0, sizeof(snakeTailY));
 	UpdateFNDScore(playerScore);
@@ -412,6 +418,9 @@ void GameRender(string playerName, unsigned int frameMs)
 			// 느린 과일 '*' 출력
 			else if (slowFruitActive && i == slowFruitY && j == slowFruitX)
 				cout << "*";
+			// 점수 2배 과일 '$' 출력
+			else if (doubleFruitActive && i == doubleFruitY && j == doubleFruitX)
+				cout << "$";
 			else
 			{
 				bool prTail = false;
@@ -448,7 +457,9 @@ void GameRender(string playerName, unsigned int frameMs)
 
 	if (slowEffectTicks > 0)
 		cout << "** SLOW! (" << slowEffectTicks << " ticks 남음) **" << endl;
-	cout << "Fruit: # = +10pts  |  * = +5pts + 속도 감소" << endl;
+	if (scoreDoubled)
+		cout << "** 점수 2배 활성화! 다음 과일 +20pts **" << endl;
+	cout << "Fruit: # = +10pts  |  * = +5pts + 속도 감소  |  $ = 다음 과일 점수 2배" << endl;
 
 	// 모드 표시
 	string modeLabel = wrapWalls ? "Wrap (벽 닿으면 반대편으로)" : "Normal (벽 닿으면 죽음)";
@@ -559,7 +570,8 @@ void UpdateGame()
 	// 일반 과일('#') 충돌 확인
 	if (x == fruitCordX && y == fruitCordY)
 	{
-		playerScore += 10;
+		playerScore += scoreDoubled ? 20 : 10;
+		scoreDoubled = false;
 		snakeTailLen++;
 		UpdateFNDScore(playerScore);
 		fruitCordX = rand() % width;
@@ -570,6 +582,13 @@ void UpdateGame()
 			slowFruitActive = true;
 			slowFruitX = rand() % width;
 			slowFruitY = rand() % height;
+		}
+		// 20% 확률로 점수 2배 과일 생성
+		if (!doubleFruitActive && (rand() % 10) < 2)
+		{
+			doubleFruitActive = true;
+			doubleFruitX = rand() % width;
+			doubleFruitY = rand() % height;
 		}
 		// 과일 획득 효과음 재생
 		if (fd_buzzer >= 0)
@@ -589,6 +608,15 @@ void UpdateGame()
 		slowEffectTicks = SLOW_DURATION;
 		// 느린 과일 효과음 재생 (낮은 음)
 		PlayBuzzerNote("E5", 140);
+	}
+
+	// 점수 2배 과일('$') 충돌 확인
+	if (doubleFruitActive && x == doubleFruitX && y == doubleFruitY)
+	{
+		doubleFruitActive = false;
+		scoreDoubled = true;
+		PlayBuzzerNote("C6", 80);
+		PlayBuzzerNote("E6", 80);
 	}
 
 	// 속도 감소 효과 틱 감소
