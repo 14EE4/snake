@@ -45,6 +45,10 @@ bool slowFruitActive = false;
 int slowFruitX, slowFruitY;
 int slowEffectTicks = 0;
 const int SLOW_DURATION = 20;
+// 점수 2배 과일($) 좌표 및 상태
+bool doubleFruitActive = false;
+int doubleFruitX, doubleFruitY;
+bool scoreDoubled = false;
 // 플레이어 점수
 int playerScore;
 // 최고 점수
@@ -130,6 +134,8 @@ void GameInit()
 	snakeTailLen = 0;
 	slowFruitActive = false;
 	slowEffectTicks = 0;
+	doubleFruitActive = false;
+	scoreDoubled = false;
 	memset(snakeTailX, 0, sizeof(snakeTailX));
 	memset(snakeTailY, 0, sizeof(snakeTailY));
 	UpdateFNDScore(playerScore);
@@ -175,18 +181,21 @@ unsigned int SelectDifficulty()
 				if (sw_state[0])
 				{
 					cout << ">> Easy 선택!" << endl;
+					PlayBuzzerNote("A5", 90);
 					sleep(1);
 					return 200;
 				}
 				if (sw_state[1])
 				{
 					cout << ">> Normal 선택!" << endl;
+					PlayBuzzerNote("C5", 90);
 					sleep(1);
 					return 150;
 				}
 				if (sw_state[2])
 				{
 					cout << ">> Hard 선택!" << endl;
+					PlayBuzzerNote("E5", 90);
 					sleep(1);
 					return 100;
 				}
@@ -207,11 +216,13 @@ unsigned int SelectDifficulty()
 			if (choice == '0')
 			{
 				cout << ">> Easy 선택!" << endl;
+				PlayBuzzerNote("A5", 90);
 				return 200;
 			}
 			if (choice == '1')
 			{
 				cout << ">> Normal 선택!" << endl;
+				PlayBuzzerNote("C5", 90);
 				return 150;
 			}
 			if (choice == '2')
@@ -263,12 +274,14 @@ bool SelectMode()
 				if (sw_state[0])
 				{
 					cout << ">> Normal 모드 선택!" << endl;
+					PlayBuzzerNote("A4", 120);
 					sleep(1);
 					return false;
 				}
 				if (sw_state[1])
 				{
 					cout << ">> Wrap 모드 선택!" << endl;
+					PlayBuzzerNote("C4", 120);
 					sleep(1);
 					return true;
 				}
@@ -345,6 +358,7 @@ bool PromptRestart()
 			{
 				if (sw_state[0])
 				{
+					PlayStartSound();
 					return true;
 				}
 				if (sw_state[2])
@@ -404,6 +418,9 @@ void GameRender(string playerName, unsigned int frameMs)
 			// 느린 과일 '*' 출력
 			else if (slowFruitActive && i == slowFruitY && j == slowFruitX)
 				cout << "*";
+			// 점수 2배 과일 '$' 출력
+			else if (doubleFruitActive && i == doubleFruitY && j == doubleFruitX)
+				cout << "$";
 			else
 			{
 				bool prTail = false;
@@ -440,7 +457,9 @@ void GameRender(string playerName, unsigned int frameMs)
 
 	if (slowEffectTicks > 0)
 		cout << "** SLOW! (" << slowEffectTicks << " ticks 남음) **" << endl;
-	cout << "Fruit: # = +10pts  |  * = +5pts + 속도 감소" << endl;
+	if (scoreDoubled)
+		cout << "** 점수 2배 활성화! 다음 과일 +20pts **" << endl;
+	cout << "Fruit: # = +10pts  |  * = +5pts + 속도 감소  |  $ = 다음 과일 점수 2배" << endl;
 
 	// 모드 표시
 	string modeLabel = wrapWalls ? "Wrap (벽 닿으면 반대편으로)" : "Normal (벽 닿으면 죽음)";
@@ -551,7 +570,8 @@ void UpdateGame()
 	// 일반 과일('#') 충돌 확인
 	if (x == fruitCordX && y == fruitCordY)
 	{
-		playerScore += 10;
+		playerScore += scoreDoubled ? 20 : 10;
+		scoreDoubled = false;
 		snakeTailLen++;
 		UpdateFNDScore(playerScore);
 		fruitCordX = rand() % width;
@@ -562,6 +582,13 @@ void UpdateGame()
 			slowFruitActive = true;
 			slowFruitX = rand() % width;
 			slowFruitY = rand() % height;
+		}
+		// 20% 확률로 점수 2배 과일 생성
+		if (!doubleFruitActive && (rand() % 10) < 2)
+		{
+			doubleFruitActive = true;
+			doubleFruitX = rand() % width;
+			doubleFruitY = rand() % height;
 		}
 		// 과일 획득 효과음 재생
 		if (fd_buzzer >= 0)
@@ -581,6 +608,15 @@ void UpdateGame()
 		slowEffectTicks = SLOW_DURATION;
 		// 느린 과일 효과음 재생 (낮은 음)
 		PlayBuzzerNote("E5", 140);
+	}
+
+	// 점수 2배 과일('$') 충돌 확인
+	if (doubleFruitActive && x == doubleFruitX && y == doubleFruitY)
+	{
+		doubleFruitActive = false;
+		scoreDoubled = true;
+		PlayBuzzerNote("C6", 80);
+		PlayBuzzerNote("E6", 80);
 	}
 
 	// 속도 감소 효과 틱 감소
@@ -631,14 +667,25 @@ void FPGASwitchInput()
 	if (read(fd_fpga_switch, sw_state, 13) > 0)
 	{
 		// 버튼 매핑: 1=위, 3=왼쪽, 5=오른쪽, 7=아래
-		if (sw_state[1])
+		if (sw_state[1]){
+			PlayBuzzerNote("G4", 120);
 			sDir = UP;
-		if (sw_state[3])
+		}
+
+		if (sw_state[3]){
+			PlayBuzzerNote("C4", 120);
 			sDir = LEFT;
-		if (sw_state[5])
+		}
+
+		if (sw_state[5]){
+			PlayBuzzerNote("E4", 120);
 			sDir = RIGHT;
-		if (sw_state[7])
+		}
+		if (sw_state[7]){
+			PlayBuzzerNote("D4", 120);
 			sDir = DOWN;
+		}
+
 	}
 }
 
@@ -668,6 +715,7 @@ bool PauseMenu()
 	disableRawMode();
 
 	cout << "\n=== Game Paused ===" << endl;
+	PlayGameOverSound();
 	if (use_fpga_switch)
 	{
 		cout << "FPGA: Button 0 = Resume, Button 2 = Exit" << endl;
@@ -736,11 +784,14 @@ bool PauseMenu()
 				unsigned char sw_state[13];
 				if (read(fd_fpga_switch, sw_state, 13) > 0)
 				{
+					//continue 
 					if (sw_state[0] && !prev_fpga[0])
 					{
+						PlayStartSound();
 						enableRawMode();
 						return true;
 					}
+					//game over if button 2 is pressed
 					if (sw_state[2] && !prev_fpga[2])
 					{
 						PlayGameOverSound();
