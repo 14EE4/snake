@@ -9,6 +9,20 @@
 #include <time.h>
 #include <ctype.h>
 
+// Deterministic lookup table for equal-tempered notes.
+// Rows: C0..B8, Columns: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
+static const int frequency_table[9][12] = {
+    {16, 17, 18, 19, 21, 22, 23, 25, 26, 28, 29, 31},
+    {33, 35, 37, 39, 41, 44, 46, 49, 52, 55, 58, 62},
+    {65, 69, 73, 78, 82, 87, 92, 98, 104, 110, 117, 123},
+    {131, 139, 147, 156, 165, 175, 185, 196, 208, 220, 233, 247},
+    {262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494},
+    {523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988},
+    {1047, 1109, 1175, 1245, 1319, 1397, 1480, 1568, 1661, 1760, 1865, 1976},
+    {2093, 2217, 2349, 2489, 2637, 2794, 2960, 3136, 3322, 3520, 3729, 3951},
+    {4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902}
+};
+
 int write_value(int fd, unsigned char value)
 {
     if (write(fd, &value, 1) != 1)
@@ -33,21 +47,27 @@ int read_value(int fd, unsigned char *value)
 
 int play_tone(int fd, unsigned int freq, long duration_ms)
 {
+    return play_tone_seconds(fd, freq, (double)duration_ms / 1000.0);
+}
+
+int play_tone_seconds(int fd, unsigned int freq, double duration_s)
+{
     if (freq < 20 || freq > 20000) return -1;
+    if (duration_s <= 0.0) return -1;
 
     unsigned int half_period_us = 500000 / freq; // 1/(2*f) in us
     struct timespec start, now;
     long elapsed_us = 0;
-    long target_us = duration_ms * 1000L;
+    long target_us = (long)(duration_s * 1000000.0 + 0.5);
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     while (elapsed_us < target_us)
     {
         if (write_value(fd, 1) != 0) break;
-        usleep(half_period_us);
+        if (usleep(half_period_us) != 0 && errno == EINTR) break;
         if (write_value(fd, 0) != 0) break;
-        usleep(half_period_us);
+        if (usleep(half_period_us) != 0 && errno == EINTR) break;
 
         clock_gettime(CLOCK_MONOTONIC, &now);
         elapsed_us = (now.tv_sec - start.tv_sec) * 1000000L + (now.tv_nsec - start.tv_nsec) / 1000L;
@@ -100,20 +120,6 @@ int note_name_to_frequency(const char *name, int *out_freq)
 
     semitone_from_A += accidental;
 
-    // Use a deterministic lookup table for equal-tempered notes.
-    // Columns: C, C#, D, D#, E, F, F#, G, G#, A, A#, B
-    static const int frequency_table[9][12] = {
-        {16, 17, 18, 19, 21, 22, 23, 25, 26, 28, 29, 31},
-        {33, 35, 37, 39, 41, 44, 46, 49, 52, 55, 58, 62},
-        {65, 69, 73, 78, 82, 87, 92, 98, 104, 110, 117, 123},
-        {131, 139, 147, 156, 165, 175, 185, 196, 208, 220, 233, 247},
-        {262, 277, 294, 311, 330, 349, 370, 392, 415, 440, 466, 494},
-        {523, 554, 587, 622, 659, 698, 740, 784, 831, 880, 932, 988},
-        {1047, 1109, 1175, 1245, 1319, 1397, 1480, 1568, 1661, 1760, 1865, 1976},
-        {2093, 2217, 2349, 2489, 2637, 2794, 2960, 3136, 3322, 3520, 3729, 3951},
-        {4186, 4435, 4699, 4978, 5274, 5588, 5920, 6272, 6645, 7040, 7459, 7902}
-    };
-
     int note_index = -1;
     switch (note)
     {
@@ -141,6 +147,20 @@ int note_name_to_frequency(const char *name, int *out_freq)
 
     if (octave < 0 || octave > 8)
         return -1;
+
+    *out_freq = frequency_table[octave][note_index];
+    return 0;
+}
+
+int midi_note_to_frequency(int midi_note, int *out_freq)
+{
+    if (!out_freq) return -1;
+    if (midi_note < 12 || midi_note > 119) return -1;
+
+    int octave = midi_note / 12 - 1;
+    int note_index = midi_note % 12;
+
+    if (octave < 0 || octave > 8) return -1;
 
     *out_freq = frequency_table[octave][note_index];
     return 0;
