@@ -59,70 +59,51 @@ static void PlayBuzzerNote(const char *note_name, long duration_ms)
 // FPGA 푸시 스위치 입력 처리 함수
 bool FPGASwitchInput()
 {
-	const char *scale[] = {"C4","D4","E4","F4","G4","A4","B4","C5"};
-	if (fd_fpga_switch < 0)
-		return;
+    unsigned char sw_state[13] = {0};
+    if (fd_fpga_switch < 0) return false;
 
-	unsigned char sw_state[13];
-	if (read(fd_fpga_switch, sw_state, 13) > 0)
-	{
-		
+    if (read(fd_fpga_switch, sw_state, sizeof(sw_state)) > 0)
+    {
+        if (sw_state[0]) PlayBuzzerNote("C4", 120);
+        if (sw_state[1]) PlayBuzzerNote("D4", 120);
+        if (sw_state[2]) PlayBuzzerNote("E4", 120);
+        if (sw_state[3]) PlayBuzzerNote("F4", 120);
+        if (sw_state[4]) PlayBuzzerNote("G4", 120);
+        if (sw_state[5]) PlayBuzzerNote("A4", 120);
+        if (sw_state[6]) PlayBuzzerNote("B4", 120);
+        if (sw_state[7]) PlayBuzzerNote("C5", 120);
 
-		if (sw_state[0])
-			PlayBuzzerNote("C4", 120);
-		if (sw_state[1])
-			PlayBuzzerNote("D4", 120);
-		if (sw_state[2])
-			PlayBuzzerNote("E4", 120);
-		if (sw_state[3])
-			PlayBuzzerNote("F4", 120);
-		if (sw_state[4])
-			PlayBuzzerNote("G4", 120);
-		if (sw_state[5])
-			PlayBuzzerNote("A4", 120);
-		if (sw_state[6])
-			PlayBuzzerNote("B4", 120);
-		if (sw_state[7])
-			PlayBuzzerNote("C5", 120);
-		if (sw_state[8])
-			return false;
-	}
+        if (sw_state[8]) return false; // 8번 스위치 누르면 종료
+    }
+    return true; // 계속 반복
 }
 
-int main(int argc, char *argv[])
+
+int main(void)
 {
-	int fd;
-	unsigned char value = 0;
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = handle_sigint;
+    sigaction(SIGINT, &sa, NULL);
 
-	struct sigaction sa;
+    fd_buzzer = open(BUZZER_DEVICE, O_RDWR);
+    if (fd_buzzer < 0) {
+        perror("open buzzer");
+        return 1;
+    }
 
+    fd_fpga_switch = open("/dev/fpga_push_switch", O_RDONLY);
+    if (fd_fpga_switch < 0) {
+        perror("open switch");
+        close(fd_buzzer);
+        return 1;
+    }
 
+    while (FPGASwitchInput() && !g_stop_requested) {
+        usleep(20000); // 너무 빠른 반복 방지
+    }
 
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = handle_sigint;
-	sigemptyset(&sa.sa_mask);
-	sigaction(SIGINT, &sa, NULL);
-	g_stop_requested = 0;
-
-	fd = open(BUZZER_DEVICE, O_RDWR);
-	if (fd < 0)
-	{
-		perror("open");
-		fprintf(stderr, "Failed to open %s\n", BUZZER_DEVICE);
-		return 1;
-	}
-
-	g_buzzer_fd = fd;
-
-
-	while(FPGASwitchInput())
-	{
-		
-
-	}
-
-
-	cleanup_buzzer();
-	g_buzzer_fd = -1;
-	return 0;
+    close(fd_fpga_switch);
+    cleanup_buzzer();
+    return 0;
 }
