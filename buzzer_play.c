@@ -46,15 +46,7 @@ static void handle_sigint(int signum)
 
 // note_name_to_frequency and play_tone are provided in buzzer.c via buzzer.h
 
-static void PlayBuzzerNote(const char *note_name, long duration_ms)
-{
-	if (fd_buzzer < 0)
-		return;
 
-	int freq = 0;
-	if (note_name_to_frequency(note_name, &freq) == 0)
-		play_tone(fd_buzzer, (unsigned int)freq, duration_ms);
-}
 
 // FPGA 푸시 스위치 입력 처리 함수
 bool FPGASwitchInput()
@@ -64,19 +56,53 @@ bool FPGASwitchInput()
 
     if (read(fd_fpga_switch, sw_state, sizeof(sw_state)) > 0)
     {
-        if (sw_state[0]) PlayBuzzerNote("C4", 120);
-        if (sw_state[1]) PlayBuzzerNote("D4", 120);
-        if (sw_state[2]) PlayBuzzerNote("E4", 120);
-        if (sw_state[3]) PlayBuzzerNote("F4", 120);
-        if (sw_state[4]) PlayBuzzerNote("G4", 120);
-        if (sw_state[5]) PlayBuzzerNote("A4", 120);
-        if (sw_state[6]) PlayBuzzerNote("B4", 120);
-        if (sw_state[7]) PlayBuzzerNote("C5", 120);
+        int freq = 0;
 
-        if (sw_state[8]) return false; // 8번 스위치 누르면 종료
+        if (sw_state[0] && note_name_to_frequency("C4", &freq) == 0) {
+            printf("Button 0 pressed -> C4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[1] && note_name_to_frequency("D4", &freq) == 0) {
+            printf("Button 1 pressed -> D4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[2] && note_name_to_frequency("E4", &freq) == 0) {
+            printf("Button 2 pressed -> E4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[3] && note_name_to_frequency("F4", &freq) == 0) {
+            printf("Button 3 pressed -> F4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[4] && note_name_to_frequency("G4", &freq) == 0) {
+            printf("Button 4 pressed -> G4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[5] && note_name_to_frequency("A4", &freq) == 0) {
+            printf("Button 5 pressed -> A4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[6] && note_name_to_frequency("B4", &freq) == 0) {
+            printf("Button 6 pressed -> B4\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else if (sw_state[7] && note_name_to_frequency("C5", &freq) == 0) {
+            printf("Button 7 pressed -> C5\n");
+            play_tone(fd_buzzer, freq, 200);
+        }
+        else {
+            write_value(fd_buzzer, 0); // 아무 것도 안 눌리면 끄기
+        }
+
+        if (sw_state[8]) {
+            printf("Exit button pressed -> Program terminating\n");
+            return false; // 8번 스위치 누르면 종료
+        }
     }
-    return true; // 계속 반복
+    return true;
 }
+
+
 
 
 int main(void)

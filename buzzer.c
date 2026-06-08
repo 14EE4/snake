@@ -81,7 +81,6 @@ int note_name_to_frequency(const char *name, int *out_freq)
 {
     if (!name || !out_freq) return -1;
 
-    // Robust parse: skip leading whitespace, accept note letter, optional accidental, then octave digits
     const char *p = name;
     while (*p && isspace((unsigned char)*p)) p++;
     if (!*p) return -1;
@@ -92,37 +91,20 @@ int note_name_to_frequency(const char *name, int *out_freq)
     char note = c;
     p++;
 
-    int accidental = 0; // +1 for sharp, -1 for flat
+    int accidental = 0;
     if (*p == '#' || *p == 's' || *p == 'S') { accidental = 1; p++; }
     else if (*p == 'b' || *p == 'B' || *p == 'f' || *p == 'F') { accidental = -1; p++; }
 
     while (*p && isspace((unsigned char)*p)) p++;
     if (!*p) return -1;
 
-    // Read octave (may be multi-digit, allow optional sign)
     char *endptr = NULL;
     long oct = strtol(p, &endptr, 10);
     if (endptr == p) return -1;
     int octave = (int)oct;
 
-    // Map note letter to semitone offset relative to A in the same octave
-    int semitone_from_A = 0;
-    switch (note) {
-        case 'C': semitone_from_A = -9; break;
-        case 'D': semitone_from_A = -7; break;
-        case 'E': semitone_from_A = -5; break;
-        case 'F': semitone_from_A = -4; break;
-        case 'G': semitone_from_A = -2; break;
-        case 'A': semitone_from_A = 0;  break;
-        case 'B': semitone_from_A = 2;  break;
-        default: return -1;
-    }
-
-    semitone_from_A += accidental;
-
     int note_index = -1;
-    switch (note)
-    {
+    switch (note) {
         case 'C': note_index = 0; break;
         case 'D': note_index = 2; break;
         case 'E': note_index = 4; break;
@@ -134,34 +116,20 @@ int note_name_to_frequency(const char *name, int *out_freq)
     }
 
     note_index += accidental;
-    if (note_index < 0)
-    {
+
+    // 옥타브 보정
+    if (note_index < 0) {
         note_index += 12;
         octave -= 1;
     }
-    if (note_index >= 12)
-    {
+    if (note_index >= 12) {
         note_index -= 12;
         octave += 1;
     }
-
-    if (octave < 0 || octave > 8)
-        return -1;
-
-    *out_freq = frequency_table[octave][note_index];
-    return 0;
-}
-
-int midi_note_to_frequency(int midi_note, int *out_freq)
-{
-    if (!out_freq) return -1;
-    if (midi_note < 12 || midi_note > 119) return -1;
-
-    int octave = midi_note / 12 - 1;
-    int note_index = midi_note % 12;
 
     if (octave < 0 || octave > 8) return -1;
 
     *out_freq = frequency_table[octave][note_index];
     return 0;
+
 }

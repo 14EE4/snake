@@ -33,7 +33,7 @@ static void handle_sigint(int signum)
 
 static void usage(const char *prog)
 {
-	printf("Usage: %s [on|off|pulse|blink|tone|note|test|seq]\n", prog);
+	printf("Usage: %s [on|off|pulse|blink|tone|note|test]\n", prog);
 	printf("  on      : write 1 to the buzzer and keep it on for 200ms\n");
 	printf("  off     : write 0 to the buzzer\n");
 	printf("  pulse   : write 1 briefly, then write 0\n");
@@ -41,98 +41,11 @@ static void usage(const char *prog)
 	printf("  tone    : generate a tone: tone <freq_hz> <duration_ms>\n");
 	printf("  note    : play musical note: note <note_name> <duration_ms> (e.g. C4, A3, G#5)\n");
 	printf("  test    : play C major scale (C4 D4 E4 F4 G4 A4 B4 C5)\n");
-	printf("  seq     : play a sequence file: seq [path]\n");
+	
 }
 
 // note_name_to_frequency and play_tone are provided in buzzer.c via buzzer.h
 
-static int play_sequence_file(int fd, const char *path)
-{
-	FILE *fp = fopen(path, "r");
-	if (!fp)
-	{
-		perror("fopen");
-		fprintf(stderr, "Failed to open sequence file: %s\n", path);
-		return -1;
-	}
-
-	char line[128];
-	int line_no = 0;
-	while (fgets(line, sizeof(line), fp))
-	{
-		if (g_stop_requested)
-			break;
-
-		line_no++;
-		char *p = line;
-		while (*p && isspace((unsigned char)*p)) p++;
-		if (*p == '\0' || *p == '#')
-			continue;
-
-		char *comma = strchr(p, ',');
-		char *comma2 = comma ? strchr(comma + 1, ',') : NULL;
-		if (!comma || !comma2)
-		{
-			fprintf(stderr, "Skipping malformed line %d: %s", line_no, line);
-			continue;
-		}
-
-		char *rest_str = comma + 1;
-		char *duration_str = comma2 + 1;
-		*comma = '\0';
-		*comma2 = '\0';
-
-		char *midi_end = NULL;
-		char *rest_end = NULL;
-		char *duration_end = NULL;
-		long midi_note = strtol(p, &midi_end, 10);
-		double rest_value = strtod(rest_str, &rest_end);
-		double duration_value = strtod(duration_str, &duration_end);
-		if (midi_end == p || rest_end == rest_str || duration_end == duration_str)
-		{
-			fprintf(stderr, "Skipping malformed line %d: %s", line_no, line);
-			continue;
-		}
-
-		double rest_ms = rest_value;
-		double duration_ms = duration_value;
-		if (strchr(rest_str, '.') || strchr(rest_str, 'e') || strchr(rest_str, 'E'))
-		{
-			if (rest_value > 0.0 && rest_value < 10.0)
-				rest_ms = rest_value * 1000.0;
-		}
-		if (strchr(duration_str, '.') || strchr(duration_str, 'e') || strchr(duration_str, 'E'))
-		{
-			if (duration_value > 0.0 && duration_value < 10.0)
-				duration_ms = duration_value * 1000.0;
-		}
-
-		int freq = 0;
-		if (midi_note_to_frequency((int)midi_note, &freq) != 0)
-		{
-			fprintf(stderr, "Skipping unsupported MIDI note %ld on line %d\n", midi_note, line_no);
-			continue;
-		}
-
-		if (rest_ms > 0.0)
-		{
-			if (usleep((useconds_t)(rest_ms * 1000.0 + 0.5)) != 0 && errno == EINTR)
-				break;
-		}
-
-		if (duration_ms <= 0.0)
-			duration_ms = 100.0;
-
-		fprintf(stderr, "seq line %d: note=%ld freq=%d rest=%.3fms length=%.3fms\n",
-			line_no, midi_note, freq, rest_ms, duration_ms);
-		play_tone_seconds(fd, (unsigned int)freq, duration_ms / 1000.0);
-		if (g_stop_requested)
-			break;
-	}
-
-	fclose(fp);
-	return 0;
-}
 
 int main(int argc, char *argv[])
 {
@@ -207,12 +120,7 @@ int main(int argc, char *argv[])
 		if (read_value(fd, &value) == 0)
 			printf("Buzzer state read back: %u\n", value);
 	}
-	else if (strcmp(mode, "seq") == 0)
-	{
-		const char *path = (argc > 2) ? argv[2] : DEFAULT_SEQ_FILE;
-		(void)argc;
-		play_sequence_file(fd, path);
-	}
+
 	else if (strcmp(mode, "tone") == 0)
 	{
 		int freq = 440;
